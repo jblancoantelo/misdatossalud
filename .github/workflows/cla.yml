@@ -1,0 +1,60 @@
+name: "CLA Assistant"
+
+# Nota: contributor-assistant/github-action está archivado desde marzo de 2026.
+# La versión v2.6.1 sigue funcionando; si deja de hacerlo, migrar a un fork mantenido.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  CLAAssistant:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "CLA Assistant"
+        if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
+        uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Si guardas las firmas en otro repositorio, añade un PAT con scope repo:
+          # PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        with:
+          path-to-signatures: 'signatures/version1/cla.json'
+          # La URL apunta a la rama base del PR; si no existe, a la rama por defecto.
+          path-to-document: 'https://github.com/${{ github.repository }}/blob/${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}/CLA.md'
+          # Rama no protegida donde se guardan las firmas.
+          branch: 'cla-signatures'
+          allowlist: 'dependabot[bot],renovate[bot],github-actions[bot]'
+          custom-notsigned-prcomment: |
+            Gracias por tu contribución. Antes de fusionar, necesitamos que firmes el CLA:
+
+            $pathToCLADocument
+
+            Para firmarlo, responde a este pull request con exactamente:
+
+            I have read the CLA Document and I hereby sign the CLA
+
+            Si ya lo firmaste en otro pull request, responde `recheck`.
+
+            ---
+
+            Thank you for your contribution. Before merging, we need you to sign the CLA:
+
+            $pathToCLADocument
+
+            To sign it, reply to this pull request with exactly:
+
+            I have read the CLA Document and I hereby sign the CLA
+
+            If you already signed it in another pull request, reply `recheck`.
+          custom-allsigned-prcomment: |
+            Todas las personas contribuyentes han firmado el CLA. / All contributors have signed the CLA.
+          lock-pullrequest-aftermerge: true
