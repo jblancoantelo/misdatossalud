@@ -1,5 +1,6 @@
 # Datos personales: nunca commitear
 export/
+export_full/
 data/
 *.zip
 
