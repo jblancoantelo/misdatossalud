@@ -9,6 +9,8 @@
  * respuestas antes de escribir la sincronización definitiva.
  */
 
+import { addDays, todayISO } from '../lib/date'
+
 export const GOOGLE_HEALTH_SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
@@ -203,9 +205,8 @@ function summarise(id: string, data: unknown): string {
 }
 
 function isoDay(offsetDays: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + offsetDays)
-  return date.toISOString().slice(0, 10)
+  // Fecha civil local: la API interpreta los rangos en hora civil del usuario.
+  return addDays(todayISO(), offsetDays)
 }
 
 function civilDate(iso: string) {
