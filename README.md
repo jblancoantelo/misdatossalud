@@ -2,7 +2,9 @@
 
 PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Connect, sin backend propio.
 
-> **Estado:** funcional en local. Importa el export completo de Zepp, cifra la base con contraseña y muestra resumen, actividad, sueño, frecuencia cardiaca, entrenamientos y cuerpo. La sincronización con Google Health está implementada como **prueba de viabilidad** (OAuth + sondeo de la API), pendiente de ejecutar con un Client ID real.
+**App publicada:** https://jblancoantelo.github.io/misdatossalud/
+
+> **Estado:** funcional y desplegada. Importa el export completo de Zepp, cifra la base con contraseña y muestra resumen, actividad, sueño, frecuencia cardiaca, entrenamientos y cuerpo. La sincronización con Google Health está implementada como **prueba de viabilidad** (OAuth + sondeo de la API), pendiente de ejecutar con un Client ID real.
 
 ## Qué hace
 
@@ -45,6 +47,12 @@ npm test           # tests con Vitest
 Nota: el proyecto se sirve bajo `/misdatossalud/` (GitHub Pages). En `dev` y `preview` la URL es `http://localhost:5173/misdatossalud/` y `http://localhost:4173/misdatossalud/`.
 
 Los tests incluyen una prueba de integración con el export real (`src/import/real-export.test.ts`) que se **salta automáticamente** si no existe la carpeta `export_full/`. Con el histórico completo (933.735 filas) la importación tarda unos 3-4 segundos en un portátil.
+
+## Despliegue
+
+Cada push a `main` o `poc` ejecuta `.github/workflows/deploy.yml`: instala dependencias, pasa los tests, compila y publica `dist/` en GitHub Pages.
+
+En **Settings → Pages → Source** hay que elegir **GitHub Actions**. Con el modo antiguo (*Deploy from a branch*) GitHub publica el código fuente sin compilar: el `index.html` apunta a `/src/main.tsx` y la app no carga.
 
 ## Estructura
 

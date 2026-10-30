@@ -1,6 +1,7 @@
 # Decisiones y hallazgos — misdatossalud
 
-> Documento vivo. Fecha: 2026-10-30. Estado: **implementado en local; importación Zepp, cifrado y dashboard funcionando. Google Health implementado como sonda, pendiente de ejecutar con un Client ID real**.
+> Documento vivo. Fecha: 2026-10-30. Estado: **publicado en GitHub Pages; importación Zepp, cifrado y dashboard funcionando. Google Health implementado como sonda, pendiente de ejecutar con un Client ID real**.
+> App: https://jblancoantelo.github.io/misdatossalud/
 > Repo: https://github.com/jblancoantelo/misdatossalud (rama `poc` creada y publicada).
 
 ## 1. Decisiones confirmadas por el usuario
@@ -170,7 +171,7 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 | 6. Dashboard | Hecho: 7 vistas, filtros de periodo, cobertura por tabla |
 | 7. Resumen semanal | Hecho, con comparación frente a la semana anterior |
 | 8. Backup local cifrado y recuperación | Hecho (descarga y restauración `.mdsalud`) |
-| 9. Deploy en GitHub Pages | Pendiente |
+| 9. Deploy en GitHub Pages | Hecho: https://jblancoantelo.github.io/misdatossalud/ |
 
 ### 3.2 Arquitectura implementada
 
@@ -323,7 +324,7 @@ Siguen abiertos:
 - Verificar si las sesiones de Zepp en Health Connect incluyen GPS y si `exportExerciseTcx` devuelve ruta.
 - Crear el cliente OAuth web en Google Cloud (orígenes `http://localhost:5173`, `http://localhost:4173` y `https://jblancoantelo.github.io`), habilitar la Google Health API y configurar la pantalla de consentimiento.
 - Medir memoria y tiempo de desbloqueo en Android con el histórico completo.
-- Configurar el despliegue en GitHub Pages y probar la instalación de la PWA.
+- Probar la instalación de la PWA en Android desde la URL publicada.
 
 ## 6. Riesgos
 
@@ -346,6 +347,8 @@ Siguen abiertos:
 - Aplicación implementada: scaffold PWA, capa de datos cifrada, importador de Zepp, sonda de Google Health y las 7 vistas.
 - **Tests**: 28 pasando (`parse`, `zepp`, `crypto`, `store`, `real-export`). El test real importa 933.735 filas en ~3,6 s y se salta si falta `export_full/`.
 - **E2E manual** con Chrome headless y CDP: crear base, importar el ZIP completo, recorrer las 7 pestañas sin excepciones y descargar la copia cifrada (53,2 MB).
+- **Publicada** en https://jblancoantelo.github.io/misdatossalud/ con el workflow `.github/workflows/deploy.yml` (tests + build + `deploy-pages`). Pages debe estar en *Source: GitHub Actions*; con el modo antiguo (*Deploy from a branch*) se publicaba el código fuente sin compilar y la app no cargaba.
+- Verificado en producción: carga, manifest, service worker con scope `/misdatossalud/`, SQLite WASM (`application/wasm`), creación de la base, snapshot cifrado en OPFS y desbloqueo tras recargar.
 - `.gitignore` incluye `export/`, `export_full/`, `data/`, `*.zip`, `node_modules/`, `dist/`, `.env`, logs y artefactos de test.
 - **Ningún dato de salud se ha subido**: el repo contiene código, documentación y configuración; no hay CSV/ZIP de datos.
 - Este documento vive en `docs/decisiones.md`.
@@ -358,4 +361,4 @@ Siguen abiertos:
 - **Firma:** workflow `contributor-assistant/github-action@v2.6.1` en `.github/workflows/cla.yml`; firmas en la rama `cla-signatures`.
 - **Modelo comercial:** AGPL para la comunidad + licencia comercial (`COMMERCIAL.md`).
 - **Marca:** `TRADEMARK.md`.
-- **Pendiente:** confirmar titular legal y email comercial; revisión por un abogado; GitHub mostrará AGPL-3.0 cuando `poc` se fusione en `main`.
+- **Pendiente:** revisión del CLA por un abogado; GitHub mostrará AGPL-3.0 cuando `poc` se fusione en `main`. Titular legal y contacto confirmados: **Juan Blanco Antelo** / jblancoantelo@gmail.com.
