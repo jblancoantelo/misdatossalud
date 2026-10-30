@@ -2,27 +2,70 @@
 
 PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Connect, sin backend propio.
 
-> **Estado:** en diseño. Todavía no hay código de aplicación; este repositorio contiene la documentación y la base legal del proyecto.
+> **Estado:** funcional en local. Importa el export completo de Zepp, cifra la base con contraseña y muestra resumen, actividad, sueño, frecuencia cardiaca, entrenamientos y cuerpo. La sincronización con Google Health está implementada como **prueba de viabilidad** (OAuth + sondeo de la API), pendiente de ejecutar con un Client ID real.
 
-## Qué hará
+## Qué hace
 
-- Importar el ZIP de exportación de Zepp (CSV).
-- Sincronizar datos de Health Connect a través de la app Google Health y la Google Health API.
-- Guardar todo en el navegador, cifrado con contraseña.
-- Mostrar pasos, sueño, frecuencia cardíaca, HRV, SpO2, respiración, entrenamientos, peso y composición corporal.
-- Filtrar por fecha, origen y métrica, y comparar fuentes.
-- Funcionar offline tras la primera carga.
-- Resumen semanal.
+- **Importa el ZIP de exportación de Zepp** (las 11 carpetas de CSV) con una sola transacción e inserción idempotente.
+- **Guarda todo en el navegador** con SQLite WASM en memoria y un snapshot cifrado en OPFS (o IndexedDB como reserva).
+- **Cifra con contraseña** usando AES-GCM-256 con clave derivada por PBKDF2-SHA256 (310.000 iteraciones).
+- **Funciona offline** tras la primera carga: el service worker precachea app, CSS y el binario de SQLite.
+- **Resumen semanal** con comparación frente a la semana anterior.
+- **Vistas**: Resumen, Actividad, Sueño (con hipnograma), Corazón, Deporte, Cuerpo y Ajustes.
+- **Copia de seguridad** en un fichero `.mdsalud` cifrado, descargable y restaurable en otro dispositivo.
+- **Tema claro/oscuro** según el sistema, en español.
 
 ## Privacidad
 
-- Sin backend propio: los datos no salen de tu dispositivo salvo las llamadas a las APIs que tú autorices.
-- La base local se cifra con AES-GCM y una clave derivada de tu contraseña.
-- No se suben datos de salud al repositorio.
+- Sin backend propio: los datos no salen del dispositivo salvo las llamadas a las APIs que autorices.
+- La base vive en memoria mientras está desbloqueada; en disco solo hay un snapshot cifrado.
+- No se suben datos de salud al repositorio: `export/` y `export_full/` están en `.gitignore`.
+- Si pierdes la contraseña, los datos no se pueden recuperar: no hay servidor ni puerta trasera.
 
-## Stack previsto
+## Cómo funciona el cifrado
 
-React + TypeScript + Vite, ECharts y SQLite WASM sobre OPFS.
+El fichero `.mdsalud` tiene una cabecera JSON con parámetros (`v`, `alg`, `kdf`, `iter`, `salt`, `iv`), un salto de línea y el ciphertext. La cabecera se usa como **datos autenticados adicionales (AAD)**, así que modificar las iteraciones o la sal invalida el descifrado.
+
+El autoguardado se dispara cada 4 segundos si hay cambios pendientes, además de en `pagehide` y `visibilitychange`.
+
+## Stack
+
+React 19 + TypeScript + Vite 8, ECharts 6, sql.js 1.15 (SQLite WASM), JSZip y PapaParse. PWA con `vite-plugin-pwa`.
+
+## Desarrollo
+
+```bash
+npm install
+npm run dev        # servidor de desarrollo
+npm run build      # typecheck + build de producción
+npm run preview    # sirve dist/ (necesario para probar OPFS y el service worker)
+npm test           # tests con Vitest
+```
+
+Nota: el proyecto se sirve bajo `/misdatossalud/` (GitHub Pages). En `dev` y `preview` la URL es `http://localhost:5173/misdatossalud/` y `http://localhost:4173/misdatossalud/`.
+
+Los tests incluyen una prueba de integración con el export real (`src/import/real-export.test.ts`) que se **salta automáticamente** si no existe la carpeta `export_full/`. Con el histórico completo (933.735 filas) la importación tarda unos 3-4 segundos en un portátil.
+
+## Estructura
+
+```
+src/
+  db/        esquema SQLite, store, cifrado, almacenamiento y sesión
+  import/    importador del ZIP de Zepp
+  sync/      prueba de viabilidad de Google Health API
+  state/     ciclo crear/desbloquear/guardar/restaurar
+  ui/        vistas y componentes
+  lib/       fechas, formato y series
+docs/        decisiones y arquitectura
+```
+
+## Google Health (prueba de viabilidad)
+
+La vista de Ajustes permite pegar un Client ID OAuth de Google Cloud y lanzar cuatro comprobaciones contra `health.googleapis.com`: identidad, dispositivos emparejados, pasos diarios (`dailyRollUp`) y sesiones de sueño (`reconcile`). Muestra el estado HTTP, la latencia, un resumen y el JSON crudo de cada llamada.
+
+Sirve para confirmar antes de escribir la sincronización definitiva: que el flujo implícito de Google Identity Services funciona, que la API responde con CORS desde el navegador y qué forma tienen los datos reales. **No guarda nada en la base todavía.**
+
+Requisitos: cliente OAuth de tipo *aplicación web* con el origen autorizado, Google Health API habilitada y los scopes `googlehealth.{activity_and_fitness,health_metrics_and_measurements,sleep,location,profile}.readonly`. Al ser una app sin verificar, Google mostrará el aviso de «Google no ha verificado esta aplicación».
 
 ## Documentación
 

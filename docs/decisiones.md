@@ -1,6 +1,6 @@
 # Decisiones y hallazgos — misdatossalud
 
-> Documento vivo. Fecha: 2026-10-30. Estado: **diseño revisado; documentación legal añadida, sin código de aplicación todavía**.
+> Documento vivo. Fecha: 2026-10-30. Estado: **implementado en local; importación Zepp, cifrado y dashboard funcionando. Google Health implementado como sonda, pendiente de ejecutar con un Client ID real**.
 > Repo: https://github.com/jblancoantelo/misdatossalud (rama `poc` creada y publicada).
 
 ## 1. Decisiones confirmadas por el usuario
@@ -154,11 +154,50 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 ```
 
 - **Sin servidor**: todo el parseo y las consultas ocurren en el navegador.
-- **Origen por registro**: cada observación guarda `origen` (`zepp`, `google_health`) y `dispositivo`.
-- **Deduplicación**: regla fija **prioridad Zepp**; Google Health solo rellena huecos. La UI muestra ambos orígenes en el panel de cobertura para que la diferencia sea visible.
+- **Origen por registro**: cada tabla lleva una columna `source` (`zepp`, `google_health`). Hoy solo escribe `zepp` el importador; `google_health` queda preparado para el importador definitivo.
+- **Deduplicación**: regla fija **prioridad Zepp**; Google Health solo rellena huecos (`INSERT OR IGNORE`). La UI muestra la cobertura por tabla para que la diferencia sea visible.
 - **Backup**: copia cifrada de la base local; no es una exportación CSV/PDF para el usuario.
 
-### 3.1 Orden de implementación propuesto
+### 3.1 Estado de implementación
+
+| Paso | Estado |
+|---|---|
+| 1. Spike de validación de Google Health | **Parcial**: código de la sonda escrito (OAuth GIS + 4 llamadas); falta ejecutarlo con un Client ID |
+| 2. Repo y scaffold Vite + React + TS + PWA | Hecho |
+| 3. Capa de datos: SQLite WASM + snapshot cifrado | Hecho |
+| 4. Importador Zepp CSV | Hecho (11 carpetas, transacción única, `INSERT OR REPLACE`) |
+| 5. Importador Google Health API | **No**: solo sonda de viabilidad |
+| 6. Dashboard | Hecho: 7 vistas, filtros de periodo, cobertura por tabla |
+| 7. Resumen semanal | Hecho, con comparación frente a la semana anterior |
+| 8. Backup local cifrado y recuperación | Hecho (descarga y restauración `.mdsalud`) |
+| 9. Deploy en GitHub Pages | Pendiente |
+
+### 3.2 Arquitectura implementada
+
+```
+src/
+  db/
+    schema.ts     10 tablas de datos + meta + profile, todas con columna source
+    store.ts      HealthStore: inserción por lotes, consultas, resumen semanal, cobertura
+    crypto.ts     AES-GCM-256 + PBKDF2-SHA256 (310.000 iteraciones), cabecera como AAD
+    storage.ts    OPFS con reserva a IndexedDB
+    session.ts    crear, abrir, guardar y nombrar el snapshot
+    sqlLoader.ts  carga única de sql.js con el wasm servido desde el bundle
+  import/zepp.ts  ZIP + CSV, mapeo por carpeta, timestamps UTC y locales
+  sync/googleHealth.ts  sonda OAuth + identidad, dispositivos, pasos, sueño
+  state/useSession.ts   crear/desbloquear/bloquear/restaurar/descargar/autoguardado
+  ui/             LockScreen, Chart (ECharts) y vistas Resumen/Actividad/Sueño/Corazón/Deporte/Cuerpo/Ajustes
+```
+
+Detalles que difieren del diseño inicial:
+
+- **No se usa SQLite WASM con VFS sobre OPFS.** La base vive en memoria (`sql.js`) y lo que se persiste en OPFS es el snapshot cifrado que devuelve `db.export()`. Es más simple, evita el VFS cifrado por bloques y mantiene el disco siempre cifrado. El coste es que abrir la app descifra y carga ~50 MB en memoria; medido en unos segundos.
+- **Autoguardado cada 4 s** si hay cambios pendientes, más en `pagehide` y `visibilitychange`.
+- **Formato `.mdsalud`**: cabecera JSON + `\n` + ciphertext. La cabecera (`v`, `alg`, `kdf`, `iter`, `salt`, `iv`) es el AAD, así que alterarla invalida el descifrado.
+- **Restaurar sustituye** la base del dispositivo; no hay merge, como estaba decidido.
+- **Cifrado de extremo a extremo con la contraseña del usuario**: la clave nunca se guarda; se mantiene en memoria mientras la sesión está desbloqueada.
+
+### 3.3 Orden de implementación (histórico)
 
 1. **Spike de validación** (antes de construir UI): OAuth con GIS + llamada real a Google Health API; comprobar qué métricas de Zepp aparecen vía Health Connect.
 2. Repo: `.gitignore` (`export/`, `*.zip`, `data/`), scaffold Vite + React + TS + PWA.
@@ -170,7 +209,7 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 8. Backup local cifrado y recuperación.
 9. Deploy en GitHub Pages.
 
-### 3.2 Spike de validación (bloqueante)
+### 3.4 Spike de validación (bloqueante)
 
 Antes de escribir la app hay que confirmar con datos reales:
 
@@ -180,7 +219,7 @@ Antes de escribir la app hay que confirmar con datos reales:
 
 Si el spike falla, el plan B es el backup de Health Connect + parser del SQLite, y el plan C una APK Capacitor con el SDK de HC.
 
-### 3.3 Cifrado local (decisión: contraseña)
+### 3.5 Cifrado local (decisión: contraseña)
 
 SQLite WASM no trae SQLCipher de serie. La opción más simple y segura:
 
@@ -265,19 +304,26 @@ Consecuencia de "bases independientes": el PC y el Android pueden mostrar datos 
 | SpO2 / HRV / respiración | La API los soporta; depende de HC → Google Health | Verificar en el spike |
 | GPS / rutas | `SPORT` no trae GPS; la API puede dar TCX | Intentar; condicionado al spike |
 
-### 5.5 Pendientes técnicos (se resuelven en implementación)
+### 5.5 Pendientes técnicos
 
-- Rendimiento de ~930k filas en SQLite WASM en memoria + snapshot cifrado en Android; medir y, si falla, agregar por día o usar `wa-sqlite` con OPFS.
-- Zona horaria: usar la del dispositivo (por defecto `Europe/Madrid`) y resolver DST. `ACTIVITY_MINUTE`/`HEARTRATE_AUTO` no traen offset; `SLEEP`/`SPORT` traen `+0000`.
-- Deduplicación por granularidad: diario vs minuto; no comparar `ACTIVITY` con `ACTIVITY_MINUTE`.
-- Excluir `USER` (userId, nickName, avatar, birthday) del importador.
-- Verificar CORS real de `health.googleapis.com` desde el navegador.
+Resueltos durante la implementación:
+
+- ~~Rendimiento de ~930k filas~~: la importación completa tarda 3-4 s y el snapshot cifrado ocupa ~50 MB. Verificado en Chrome de escritorio; falta medir en Android.
+- ~~Zona horaria~~: `ACTIVITY_MINUTE`/`HEARTRATE_AUTO` se interpretan en hora local del dispositivo; `SLEEP`/`SPORT`/`BODY` traen offset y se convierten a epoch. Las horas `>24` de algunos exports se normalizan con `Date`.
+- ~~Excluir `USER` del importador~~: se importa solo a la tabla `profile`, nunca como fila de datos.
+- ~~`base` de Vite y scope del service worker~~: configurados en `/misdatossalud/`.
+- ~~Aceptar ZIP con rutas `\` o `/`~~: `Compress-Archive` de Windows genera barras invertidas y el importador lo soporta; si no reconoce ninguna tabla, aborta con un error claro.
+
+Siguen abiertos:
+
+- Verificar CORS real de `health.googleapis.com` desde el navegador (la sonda está escrita, sin ejecutar).
 - Renovación silenciosa de GIS y comportamiento si falla.
-- `base` de Vite para GitHub Pages (`/misdatossalud/`) y scope del service worker.
 - Tipos sin `list` (solo `rollUp`/`dailyRollUp`) y paginación de 25 en sueño/ejercicio.
-- Aceptar ZIP y carpeta descomprimida como entrada del importador.
-- Verificar si las sesiones de Zepp en Health Connect incluyen GPS y si `exportExerciseTcx` devuelve ruta; el scope `location.readonly` es adicional y restringido.
-- Crear el cliente OAuth web en Google Cloud (orígenes `http://localhost:5173` y `https://jblancoantelo.github.io`), habilitar la Google Health API y configurar la pantalla de consentimiento con los scopes necesarios.
+- Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`).
+- Verificar si las sesiones de Zepp en Health Connect incluyen GPS y si `exportExerciseTcx` devuelve ruta.
+- Crear el cliente OAuth web en Google Cloud (orígenes `http://localhost:5173`, `http://localhost:4173` y `https://jblancoantelo.github.io`), habilitar la Google Health API y configurar la pantalla de consentimiento.
+- Medir memoria y tiempo de desbloqueo en Android con el histórico completo.
+- Configurar el despliegue en GitHub Pages y probar la instalación de la PWA.
 
 ## 6. Riesgos
 
@@ -296,10 +342,12 @@ Consecuencia de "bases independientes": el PC y el Android pueden mostrar datos 
 
 ## 7. Estado del repositorio y privacidad
 
-- Rama `poc` creada y subida a `origin`; últimos commits: `c118b38`, `b2213b0` y `6c98915`.
-- `.gitignore` ya incluye `export/`, `export_full/`, `data/`, `*.zip`, `node_modules/`, `dist/`, `.env`, logs y artefactos de test.
-- **Ningún dato de salud se ha subido**: el repo contiene documentación y configuración; no hay CSV/ZIP de datos.
-- Sin código de aplicación todavía; documentación legal y workflow de CLA añadidos (`6c98915`).
+- Rama `poc` creada y subida a `origin`. Commits iniciales: `c118b38`, `b2213b0`, `6c98915` (licencia/CLA/workflow) y `cb98508` (decisiones en `docs/`).
+- Aplicación implementada: scaffold PWA, capa de datos cifrada, importador de Zepp, sonda de Google Health y las 7 vistas.
+- **Tests**: 28 pasando (`parse`, `zepp`, `crypto`, `store`, `real-export`). El test real importa 933.735 filas en ~3,6 s y se salta si falta `export_full/`.
+- **E2E manual** con Chrome headless y CDP: crear base, importar el ZIP completo, recorrer las 7 pestañas sin excepciones y descargar la copia cifrada (53,2 MB).
+- `.gitignore` incluye `export/`, `export_full/`, `data/`, `*.zip`, `node_modules/`, `dist/`, `.env`, logs y artefactos de test.
+- **Ningún dato de salud se ha subido**: el repo contiene código, documentación y configuración; no hay CSV/ZIP de datos.
 - Este documento vive en `docs/decisiones.md`.
 - Regla: ningún dato de salud real se commitea; solo fixtures sintéticos si hacen falta para tests.
 
