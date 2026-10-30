@@ -24,6 +24,10 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 
 React + TypeScript + Vite, ECharts y SQLite WASM sobre OPFS.
 
+## Documentación
+
+- [Decisiones y arquitectura](docs/decisiones.md)
+
 ## Licencia
 
 Este proyecto se distribuye bajo **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`). Consulta [LICENSE](LICENSE).
