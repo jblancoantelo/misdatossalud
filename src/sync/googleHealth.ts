@@ -17,6 +17,8 @@ export const GOOGLE_HEALTH_SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
   'https://www.googleapis.com/auth/googlehealth.location.readonly',
   'https://www.googleapis.com/auth/googlehealth.profile.readonly',
+  // ListPairedDevices exige este scope; sin él devuelve 403.
+  'https://www.googleapis.com/auth/googlehealth.settings.readonly',
 ]
 
 const API_BASE = 'https://health.googleapis.com/v4'
@@ -163,8 +165,25 @@ async function apiCall(
 
 function errorMessage(data: unknown): string | null {
   if (data && typeof data === 'object' && 'error' in data) {
-    const error = (data as { error?: { message?: string; status?: string } }).error
+    const error = (data as { error?: { message?: string; status?: string; details?: unknown[] } }).error
+    const reason = findReason(error?.details)
+    if (reason === 'ACCOUNT_NOT_LINKED') {
+      return 'La cuenta de Google no está vinculada a Google Health. Instala la app Google Health en el móvil, crea o vincula la cuenta y conecta Health Connect; después repite la prueba.'
+    }
+    if (reason === 'ACCESS_TOKEN_SCOPE_INSUFFICIENT') {
+      return 'El token no incluye el scope necesario para este endpoint. Vuelve a conectar para aceptar el permiso que falta.'
+    }
     if (error?.message) return error.status ? `${error.status}: ${error.message}` : error.message
+  }
+  return null
+}
+
+function findReason(details: unknown[] | undefined): string | null {
+  if (!Array.isArray(details)) return null
+  for (const detail of details) {
+    if (detail && typeof detail === 'object' && 'reason' in detail) {
+      return String((detail as { reason?: unknown }).reason)
+    }
   }
   return null
 }

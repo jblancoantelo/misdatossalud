@@ -1,6 +1,6 @@
 # Decisiones y hallazgos — misdatossalud
 
-> Documento vivo. Fecha: 2026-10-30. Estado: **publicado en GitHub Pages; importación Zepp, cifrado y dashboard funcionando. Google Health implementado como sonda, pendiente de ejecutar con un Client ID real**.
+> Documento vivo. Fecha: 2026-10-31. Estado: **publicado en GitHub Pages; importación Zepp, cifrado y dashboard funcionando. Google Health validado técnicamente (OAuth, CORS y endpoints OK); bloqueado por cuenta sin vincular a Google Health**.
 > App: https://jblancoantelo.github.io/misdatossalud/
 > Repo: https://github.com/jblancoantelo/misdatossalud (rama `poc` creada y publicada).
 
@@ -67,6 +67,24 @@
   - https://developers.google.com/health/data-types
 
 **Consecuencia:** la vía `Zepp → Health Connect → app Google Health → Google Health API → PWA` es viable y **no requiere Drive**. Está pendiente de validar en la práctica qué métricas de Zepp llegan a Health Connect y de ahí a Google Health.
+
+#### 2.2.1 Resultado del spike (2026-10-31)
+
+Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tipo aplicación web y sesión de Google en el navegador.
+
+| Comprobación | Resultado |
+|---|---|
+| OAuth con GIS (flujo implícito) | **OK**: token obtenido con los 6 scopes, sin Client Secret |
+| CORS desde el navegador | **OK**: las cuatro llamadas llegan y devuelven JSON; no hay bloqueo de origen |
+| Endpoints y cuerpos | **OK**: `/users/me/identity`, `pairedDevices`, `dataPoints:dailyRollUp` y `dataPoints:reconcile` existen y validan la petición |
+| Scopes | **Corregido**: `ListPairedDevices` exige `googlehealth.settings.readonly`; sin él devolvía `403 ACCESS_TOKEN_SCOPE_INSUFFICIENT` |
+| Cuenta | **BLOQUEO**: `400 FAILED_PRECONDITION · ACCOUNT_NOT_LINKED` en los cuatro checks |
+
+El error de cuenta trae `redirect_uri: https://fitbit.google.com/auth/signup`: la cuenta de Google **debe estar vinculada a Google Health** (la antigua cuenta Fitbit). No es un problema de código ni de configuración de OAuth.
+
+**Vía de resolución:** instalar la app **Google Health** (antes Fitbit) en el Android, crear o vincular la cuenta, y conectar **Health Connect** en la propia app. A partir de ahí Google Health sube a su nube los datos que Zepp escribe en Health Connect y la API los devuelve. La documentación de soporte lo confirma: *"The Google Health app displays data it receives through Health Connect or Apple Health."*
+
+**Riesgo asumido:** es una dependencia de una app de Google y de que acepte los datos de un dispositivo no-Fitbit vía Health Connect. Si esa cadena se rompe, la vía cloud deja de aportar datos. Por eso el importador de Zepp sigue siendo la fuente principal y Google Health solo rellena huecos.
 
 ### 2.3 El ZIP de Zepp
 
@@ -163,7 +181,7 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 
 | Paso | Estado |
 |---|---|
-| 1. Spike de validación de Google Health | **Parcial**: código de la sonda escrito (OAuth GIS + 4 llamadas); falta ejecutarlo con un Client ID |
+| 1. Spike de validación de Google Health | **Hecho**: OAuth, CORS y endpoints validados; bloqueado por cuenta sin vincular (`ACCOUNT_NOT_LINKED`) |
 | 2. Repo y scaffold Vite + React + TS + PWA | Hecho |
 | 3. Capa de datos: SQLite WASM + snapshot cifrado | Hecho |
 | 4. Importador Zepp CSV | Hecho (11 carpetas, transacción única, `INSERT OR REPLACE`) |
@@ -317,12 +335,13 @@ Resueltos durante la implementación:
 
 Siguen abiertos:
 
-- Verificar CORS real de `health.googleapis.com` desde el navegador (la sonda está escrita, sin ejecutar).
+- ~~Verificar CORS real de `health.googleapis.com`~~: confirmado, las llamadas desde el navegador funcionan.
+- ~~Crear el cliente OAuth web en Google Cloud~~: hecho; Client ID `513900864660-...apps.googleusercontent.com`, con `localhost:4173` y `https://jblancoantelo.github.io` autorizados.
+- **Vincular la cuenta a Google Health**: instalar la app Google Health en Android y conectar Health Connect. Sin esto la API devuelve `ACCOUNT_NOT_LINKED` y no hay datos que importar.
 - Renovación silenciosa de GIS y comportamiento si falla.
 - Tipos sin `list` (solo `rollUp`/`dailyRollUp`) y paginación de 25 en sueño/ejercicio.
 - Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`).
 - Verificar si las sesiones de Zepp en Health Connect incluyen GPS y si `exportExerciseTcx` devuelve ruta.
-- Crear el cliente OAuth web en Google Cloud (orígenes `http://localhost:5173`, `http://localhost:4173` y `https://jblancoantelo.github.io`), habilitar la Google Health API y configurar la pantalla de consentimiento.
 - Medir memoria y tiempo de desbloqueo en Android con el histórico completo.
 - Probar la instalación de la PWA en Android desde la URL publicada.
 
