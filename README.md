@@ -4,7 +4,7 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 
 **App publicada:** https://jblancoantelo.github.io/misdatossalud/
 
-> **Estado:** funcional y desplegada. Importa el export completo de Zepp, cifra la base con contraseña y muestra resumen, actividad, sueño, frecuencia cardiaca, entrenamientos y cuerpo. La integración con Google Health está **validada de extremo a extremo**: OAuth, CORS y datos reales (pasos) desde Health Connect. Falta confirmar la cobertura de sueño y el resto de tipos.
+> **Estado:** funcional y desplegada. Importa el export completo de Zepp, cifra la base con contraseña y muestra resumen, actividad, sueño, frecuencia cardiaca, entrenamientos y cuerpo, con filtro global de fechas. La integración con Google Health está **validada de extremo a extremo**: OAuth, CORS y pasos reales desde Health Connect. El sueño **no llega** a Google Health desde esta cuenta (la API no tiene sesiones); queda confirmar frecuencia cardiaca y entrenamientos.
 
 ## Qué hace
 

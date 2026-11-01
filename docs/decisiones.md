@@ -1,6 +1,6 @@
 # Decisiones y hallazgos — misdatossalud
 
-> Documento vivo. Fecha: 2026-11-01. Estado: **publicado en GitHub Pages; importación Zepp, cifrado y dashboard funcionando. Google Health validado de extremo a extremo con datos reales (pasos vía Health Connect); falta confirmar el sueño**.
+> Documento vivo. Fecha: 2026-11-01. Estado: **publicado en GitHub Pages; importación Zepp, cifrado, dashboard con filtro global de fechas y Google Health validado de extremo a extremo (pasos vía Health Connect). El sueño no llega a Google Health: la cuenta no tiene sesiones, no es un problema de filtro**.
 > App: https://jblancoantelo.github.io/misdatossalud/
 > Repo: https://github.com/jblancoantelo/misdatossalud (rama `poc` creada y publicada).
 
@@ -66,7 +66,7 @@
 - La API impone límites de rango: 14 días para FC/calorías/minutos activos y 90 días para el resto en rollups; paginación de 25 para sueño/ejercicio. Obliga a sincronización por fases.
   - https://developers.google.com/health/data-types
 
-**Consecuencia:** la vía `Zepp → Health Connect → app Google Health → Google Health API → PWA` es viable y **no requiere Drive**. Ya está validada con datos reales de pasos; queda confirmar qué otros tipos (sueño, FC, entrenamientos) llegan a Health Connect y de ahí a Google Health.
+**Consecuencia:** la vía `Zepp → Health Connect → app Google Health → Google Health API → PWA` es viable y **no requiere Drive**. Está validada con datos reales de pasos. El sueño **no llega** (ver 2.2.1) y queda por confirmar FC y entrenamientos.
 
 #### 2.2.1 Resultado del spike (2026-10-31)
 
@@ -83,7 +83,7 @@ Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tip
 
 **Vía validada:** `Zepp → Health Connect → app Google Health → Google Health API → PWA`. El dispositivo que reporta la API es `MobileTrack` (el propio móvil), no un Fitbit: confirma que los datos llegan por Health Connect.
 
-**Pendiente de verificar:** el check de sueño devolvió `{}` para los últimos 14 días. La sonda ahora repite la consulta sin filtro para distinguir «no hay datos» de «el filtro no encaja». Si tampoco hay sesiones sin filtro, Health Connect no está enviando el sueño de Zepp a Google Health.
+**Sueño (2026-11-01):** la sonda completa en producción devuelve **5 checks OK** y el nuevo `Sueño (sin filtro)` también responde `{}`. Es decir, **no es un problema de filtro: la cuenta no tiene ninguna sesión de sueño** en Google Health. Además `pairedDevices` solo anuncia `DISTANCE`, `CALORIES` y `STEPS`, sin `SLEEP`. Conclusión: Health Connect reenvía actividad, pero **no el sueño**; hay que revisar los permisos de sueño en Health Connect (Zepp → Health Connect) y que la app Google Health sincronice ese tipo. La PWA ya maneja el caso vacío sin errores.
 
 **Riesgo asumido:** dependencia de una app de Google y de que acepte los datos de un dispositivo no-Fitbit vía Health Connect. Si esa cadena se rompe, la vía cloud deja de aportar datos. Por eso el importador de Zepp sigue siendo la fuente principal y Google Health solo rellena huecos.
 
@@ -339,7 +339,7 @@ Siguen abiertos:
 - ~~Verificar CORS real de `health.googleapis.com`~~: confirmado, las llamadas desde el navegador funcionan.
 - ~~Crear el cliente OAuth web en Google Cloud~~: hecho; Client ID `513900864660-...apps.googleusercontent.com`, con `localhost:4173` y `https://jblancoantelo.github.io` autorizados.
 - ~~Vincular la cuenta a Google Health~~: hecho con la cuenta de datos; la API devuelve identidad, dispositivo `MobileTrack` y pasos reales.
-- **Confirmar cobertura de sueño**: la consulta filtrada devolvió vacío; la sonda ya repite sin filtro para distinguir «sin datos» de «filtro incorrecto».
+- ~~Confirmar cobertura de sueño~~: **resuelto**; la sonda sin filtro también devuelve vacío y el dispositivo no anuncia `SLEEP`, así que Google Health no tiene sueño de esta cuenta. Siguiente paso: revisar los permisos de sueño en Health Connect en el móvil.
 - Renovación silenciosa de GIS y comportamiento si falla.
 - Tipos sin `list` (solo `rollUp`/`dailyRollUp`) y paginación de 25 en sueño/ejercicio.
 - Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`).
