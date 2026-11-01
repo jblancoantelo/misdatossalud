@@ -1,32 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { HealthStore } from '../../db/store'
-import { addDays, formatShortDate, todayISO } from '../../lib/date'
+import { formatShortDate } from '../../lib/date'
 import { km, num } from '../../lib/format'
 import { average, fillByDate, movingAverage, sum } from '../../lib/series'
 import { AXIS_LABEL, AXIS_LINE, Chart, PALETTE, SPLIT_LINE, TOOLTIP } from '../Chart'
-import { Card, Empty, RangePicker, Section, StatGrid } from '../components'
+import { Card, Empty, Section, StatGrid, type DateRange } from '../components'
 
 interface ViewProps {
   store: HealthStore
   version: number
+  range: DateRange
 }
 
-const RANGES = [
-  { value: 30, label: '30 días' },
-  { value: 90, label: '90 días' },
-  { value: 365, label: '1 año' },
-]
-
-export function ActivityView({ store, version }: ViewProps) {
-  const [range, setRange] = useState(90)
+export function ActivityView({ store, version, range }: ViewProps) {
+  const { from, to } = range
 
   const data = useMemo(() => {
-    const to = todayISO()
-    const from = addDays(to, -(range - 1))
     const rows = store.getDailyActivity(from, to)
     return { to, from, rows, aligned: fillByDate(from, to, rows) }
-  }, [store, version, range])
+  }, [store, version, from, to])
 
   const steps = data.aligned.map((entry) => entry.row?.steps ?? null)
   const distance = data.aligned.map((entry) => entry.row?.distanceM ?? null)
@@ -141,10 +134,6 @@ export function ActivityView({ store, version }: ViewProps) {
 
   return (
     <>
-      <div className="view-head">
-        <RangePicker value={range} options={RANGES} onChange={setRange} />
-      </div>
-
       <StatGrid>
         <Card label="Pasos totales" value={num(totalSteps)} hint={`${data.rows.length} días con datos`} />
         <Card label="Media diaria" value={num(avgSteps)} unit=" pasos" hint="días con registro" />

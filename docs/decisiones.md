@@ -1,6 +1,6 @@
 # Decisiones y hallazgos — misdatossalud
 
-> Documento vivo. Fecha: 2026-10-31. Estado: **publicado en GitHub Pages; importación Zepp, cifrado y dashboard funcionando. Google Health validado técnicamente (OAuth, CORS y endpoints OK); bloqueado por cuenta sin vincular a Google Health**.
+> Documento vivo. Fecha: 2026-11-01. Estado: **publicado en GitHub Pages; importación Zepp, cifrado y dashboard funcionando. Google Health validado de extremo a extremo con datos reales (pasos vía Health Connect); falta confirmar el sueño**.
 > App: https://jblancoantelo.github.io/misdatossalud/
 > Repo: https://github.com/jblancoantelo/misdatossalud (rama `poc` creada y publicada).
 
@@ -66,7 +66,7 @@
 - La API impone límites de rango: 14 días para FC/calorías/minutos activos y 90 días para el resto en rollups; paginación de 25 para sueño/ejercicio. Obliga a sincronización por fases.
   - https://developers.google.com/health/data-types
 
-**Consecuencia:** la vía `Zepp → Health Connect → app Google Health → Google Health API → PWA` es viable y **no requiere Drive**. Está pendiente de validar en la práctica qué métricas de Zepp llegan a Health Connect y de ahí a Google Health.
+**Consecuencia:** la vía `Zepp → Health Connect → app Google Health → Google Health API → PWA` es viable y **no requiere Drive**. Ya está validada con datos reales de pasos; queda confirmar qué otros tipos (sueño, FC, entrenamientos) llegan a Health Connect y de ahí a Google Health.
 
 #### 2.2.1 Resultado del spike (2026-10-31)
 
@@ -78,13 +78,14 @@ Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tip
 | CORS desde el navegador | **OK**: las cuatro llamadas llegan y devuelven JSON; no hay bloqueo de origen |
 | Endpoints y cuerpos | **OK**: `/users/me/identity`, `pairedDevices`, `dataPoints:dailyRollUp` y `dataPoints:reconcile` existen y validan la petición |
 | Scopes | **Corregido**: `ListPairedDevices` exige `googlehealth.settings.readonly`; sin él devolvía `403 ACCESS_TOKEN_SCOPE_INSUFFICIENT` |
-| Cuenta | **BLOQUEO**: `400 FAILED_PRECONDITION · ACCOUNT_NOT_LINKED` en los cuatro checks |
+| Cuenta | **OK** tras vincular Google Health: `legacyUserId=G9HLWR`, `healthUserId=5485020454767125441` |
+| Datos reales | **OK**: 1 dispositivo `MobileTrack` y **11.074 pasos** del 2026-10-31 |
 
-El error de cuenta trae `redirect_uri: https://fitbit.google.com/auth/signup`: la cuenta de Google **debe estar vinculada a Google Health** (la antigua cuenta Fitbit). No es un problema de código ni de configuración de OAuth.
+**Vía validada:** `Zepp → Health Connect → app Google Health → Google Health API → PWA`. El dispositivo que reporta la API es `MobileTrack` (el propio móvil), no un Fitbit: confirma que los datos llegan por Health Connect.
 
-**Vía de resolución:** instalar la app **Google Health** (antes Fitbit) en el Android, crear o vincular la cuenta, y conectar **Health Connect** en la propia app. A partir de ahí Google Health sube a su nube los datos que Zepp escribe en Health Connect y la API los devuelve. La documentación de soporte lo confirma: *"The Google Health app displays data it receives through Health Connect or Apple Health."*
+**Pendiente de verificar:** el check de sueño devolvió `{}` para los últimos 14 días. La sonda ahora repite la consulta sin filtro para distinguir «no hay datos» de «el filtro no encaja». Si tampoco hay sesiones sin filtro, Health Connect no está enviando el sueño de Zepp a Google Health.
 
-**Riesgo asumido:** es una dependencia de una app de Google y de que acepte los datos de un dispositivo no-Fitbit vía Health Connect. Si esa cadena se rompe, la vía cloud deja de aportar datos. Por eso el importador de Zepp sigue siendo la fuente principal y Google Health solo rellena huecos.
+**Riesgo asumido:** dependencia de una app de Google y de que acepte los datos de un dispositivo no-Fitbit vía Health Connect. Si esa cadena se rompe, la vía cloud deja de aportar datos. Por eso el importador de Zepp sigue siendo la fuente principal y Google Health solo rellena huecos.
 
 ### 2.3 El ZIP de Zepp
 
@@ -181,12 +182,12 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 
 | Paso | Estado |
 |---|---|
-| 1. Spike de validación de Google Health | **Hecho**: OAuth, CORS y endpoints validados; bloqueado por cuenta sin vincular (`ACCOUNT_NOT_LINKED`) |
+| 1. Spike de validación de Google Health | **Hecho**: OAuth, CORS, endpoints y datos reales (11.074 pasos) con la cuenta vinculada a Google Health |
 | 2. Repo y scaffold Vite + React + TS + PWA | Hecho |
 | 3. Capa de datos: SQLite WASM + snapshot cifrado | Hecho |
 | 4. Importador Zepp CSV | Hecho (11 carpetas, transacción única, `INSERT OR REPLACE`) |
 | 5. Importador Google Health API | **No**: solo sonda de viabilidad |
-| 6. Dashboard | Hecho: 7 vistas, filtros de periodo, cobertura por tabla |
+| 6. Dashboard | Hecho: 7 vistas, filtro global de fechas (presets + desde/hasta), cobertura por tabla |
 | 7. Resumen semanal | Hecho, con comparación frente a la semana anterior |
 | 8. Backup local cifrado y recuperación | Hecho (descarga y restauración `.mdsalud`) |
 | 9. Deploy en GitHub Pages | Hecho: https://jblancoantelo.github.io/misdatossalud/ |
@@ -337,7 +338,8 @@ Siguen abiertos:
 
 - ~~Verificar CORS real de `health.googleapis.com`~~: confirmado, las llamadas desde el navegador funcionan.
 - ~~Crear el cliente OAuth web en Google Cloud~~: hecho; Client ID `513900864660-...apps.googleusercontent.com`, con `localhost:4173` y `https://jblancoantelo.github.io` autorizados.
-- **Vincular la cuenta a Google Health**: instalar la app Google Health en Android y conectar Health Connect. Sin esto la API devuelve `ACCOUNT_NOT_LINKED` y no hay datos que importar.
+- ~~Vincular la cuenta a Google Health~~: hecho con la cuenta de datos; la API devuelve identidad, dispositivo `MobileTrack` y pasos reales.
+- **Confirmar cobertura de sueño**: la consulta filtrada devolvió vacío; la sonda ya repite sin filtro para distinguir «sin datos» de «filtro incorrecto».
 - Renovación silenciosa de GIS y comportamiento si falla.
 - Tipos sin `list` (solo `rollUp`/`dailyRollUp`) y paginación de 25 en sueño/ejercicio.
 - Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`).

@@ -2,55 +2,52 @@ import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { HealthStore } from '../../db/store'
 import { sportLabel } from '../../db/store'
-import { addDays, formatLongDate, formatMinutes, formatShortDate, formatWeekday, toHours, todayISO } from '../../lib/date'
+import { addDays, daysBetween, formatLongDate, formatMinutes, formatShortDate, formatWeekday, toHours } from '../../lib/date'
 import { km, num } from '../../lib/format'
 import { eachDate, fillByDate } from '../../lib/series'
 import { AXIS_LABEL, AXIS_LINE, Chart, PALETTE, SPLIT_LINE, TOOLTIP } from '../Chart'
-import { Card, DataTable, Empty, Section, StatGrid } from '../components'
+import { Card, DataTable, Empty, Section, StatGrid, type DateRange } from '../components'
 
 interface ViewProps {
   store: HealthStore
   version: number
+  range: DateRange
 }
 
-export function OverviewView({ store, version }: ViewProps) {
+export function OverviewView({ store, version, range }: ViewProps) {
+  const { from, to } = range
+
   const data = useMemo(() => {
-    const today = todayISO()
-    const summary = store.getWeeklySummary(today)
-    const from = addDays(today, -13)
-    const activity = store.getDailyActivity(from, today)
-    const sleep = store.getSleepNights(from, today)
-    const sports = store.getSports(4)
-    const coverage = store.getCoverage()
+    const days = daysBetween(from, to) + 1
+    const previousTo = addDays(from, -1)
+    const previousFrom = addDays(previousTo, -(days - 1))
+    const current = store.periodStats(from, to)
+    const previous = store.periodStats(previousFrom, previousTo)
+    const activity = store.getDailyActivity(from, to)
+    const sleep = store.getSleepNights(from, to)
+    const sports = store.getSports(1000, from, to)
     const lastSleepDate = store.getLatestSleepDate()
     const lastNight = lastSleepDate
       ? (store.getSleepNights(lastSleepDate, lastSleepDate)[0] ?? null)
       : null
-    const weekFrom = addDays(today, -6)
-    const weekActivity = store.getDailyActivity(weekFrom, today)
-    const weekSleep = store.getSleepNights(weekFrom, today)
-    const weekSports = store.getSports(100, weekFrom, today)
     return {
-      today,
-      summary,
+      from,
+      to,
+      days,
+      summary: { current, previous },
       activity,
       sleep,
       sports,
-      coverage,
       lastNight,
-      weekFrom,
-      weekActivity,
-      weekSleep,
-      weekSports,
     }
-  }, [store, version])
+  }, [store, version, from, to])
 
-  const { summary, activity, sleep, lastNight, coverage } = data
+  const { summary, activity, sleep, lastNight } = data
   const current = summary.current
   const previous = summary.previous
 
   const stepsOption = useMemo<EChartsCoreOption>(() => {
-    const aligned = fillByDate(addDays(data.today, -13), data.today, activity)
+    const aligned = fillByDate(data.from, data.to, activity)
     const values = aligned.map((entry) => entry.row?.steps ?? null)
     const valid = values.filter((value): value is number => value != null)
     const avg = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : null
@@ -100,10 +97,10 @@ export function OverviewView({ store, version }: ViewProps) {
         },
       ],
     }
-  }, [activity, data.today])
+  }, [activity, data.from, data.to])
 
   const sleepOption = useMemo<EChartsCoreOption>(() => {
-    const aligned = fillByDate(addDays(data.today, -13), data.today, sleep)
+    const aligned = fillByDate(data.from, data.to, sleep)
     return {
       grid: { left: 40, right: 14, top: 18, bottom: 26 },
       tooltip: {
@@ -138,15 +135,15 @@ export function OverviewView({ store, version }: ViewProps) {
         },
       ],
     }
-  }, [sleep, data.today])
+  }, [sleep, data.from, data.to])
 
-  const hasData = coverage.activity.rows > 0 || coverage.sleep.rows > 0
+  const hasData = activity.length > 0 || sleep.length > 0
 
   if (!hasData) {
     return (
-      <Empty title="Todavía no hay datos">
-        Ve a <strong>Ajustes</strong> e importa el ZIP de exportación de Zepp. También puedes
-        sincronizar más adelante con Google Health.
+      <Empty title="Sin datos en este periodo">
+        Cambia el rango de fechas en la barra superior o importa el export de Zepp desde{' '}
+        <strong>Ajustes</strong>.
       </Empty>
     )
   }
@@ -156,13 +153,13 @@ export function OverviewView({ store, version }: ViewProps) {
 
   return (
     <>
-      <Section title="Últimos 7 días">
+      <Section title={data.days === 1 ? 'Resumen del día' : `Resumen de ${data.days} días`}>
         <StatGrid>
           <Card
             label="Pasos al día"
             value={num(current.stepsAvg)}
             delta={current.stepsAvg != null && previous.stepsAvg != null ? current.stepsAvg - previous.stepsAvg : null}
-            hint="vs. semana anterior"
+            hint="vs. periodo anterior"
           />
           <Card
             label="Sueño por noche"
@@ -173,7 +170,7 @@ export function OverviewView({ store, version }: ViewProps) {
                 ? Number(((current.sleepAvgMin - previous.sleepAvgMin) / 60).toFixed(1))
                 : null
             }
-            hint="vs. semana anterior"
+            hint="vs. periodo anterior"
           />
           <Card
             label="Frecuencia cardiaca"
@@ -181,22 +178,22 @@ export function OverviewView({ store, version }: ViewProps) {
             unit=" ppm"
             delta={current.heartAvg != null && previous.heartAvg != null ? current.heartAvg - previous.heartAvg : null}
             goodWhenUp={false}
-            hint="media, vs. semana anterior"
+            hint="media, vs. periodo anterior"
           />
           <Card
             label="Entrenamientos"
             value={num(current.sportCount)}
             delta={current.sportCount - previous.sportCount}
-            hint={`${Math.round(current.sportMinutes)} min esta semana`}
+            hint={`${Math.round(current.sportMinutes)} min en el periodo`}
           />
         </StatGrid>
       </Section>
 
       <div className="two-col">
-        <Section title="Pasos, últimos 14 días">
+        <Section title="Pasos por día">
           <Chart option={stepsOption} height={240} ariaLabel="Gráfico de pasos diarios" />
         </Section>
-        <Section title="Sueño, últimos 14 días">
+        <Section title="Sueño por noche">
           <Chart option={sleepOption} height={240} ariaLabel="Gráfico de horas de sueño" />
         </Section>
       </div>
@@ -248,15 +245,16 @@ export function OverviewView({ store, version }: ViewProps) {
       ) : null}
 
       <div className="two-col">
-        <Section title="Semana día a día">
+        <Section title="Día a día">
           <DataTable
-            rows={eachDate(data.weekFrom, data.today).map((date) => ({
+            rows={eachDate(data.from, data.to).reverse().map((date) => ({
               date,
-              steps: data.weekActivity.find((row) => row.date === date)?.steps ?? null,
-              sleep: data.weekSleep.find((row) => row.date === date)?.totalMin ?? null,
-              sport: data.weekSports.filter((row) => row.date === date).length,
+              steps: activity.find((row) => row.date === date)?.steps ?? null,
+              sleep: sleep.find((row) => row.date === date)?.totalMin ?? null,
+              sport: data.sports.filter((row) => row.date === date).length,
             }))}
             getKey={(row) => row.date}
+            max={31}
             columns={[
               {
                 key: 'date',
@@ -275,11 +273,12 @@ export function OverviewView({ store, version }: ViewProps) {
           />
         </Section>
 
-        <Section title="Últimos entrenamientos">
+        <Section title="Entrenamientos del periodo">
           {data.sports.length ? (
             <DataTable
               rows={data.sports}
               getKey={(row) => `${row.startTs}-${row.type}`}
+              max={20}
               columns={[
                 {
                   key: 'date',

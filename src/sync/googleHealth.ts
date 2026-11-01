@@ -210,7 +210,8 @@ function summarise(id: string, data: unknown): string {
       }
       return `${points.length} día(s) devueltos, ${total.toLocaleString('es-ES')} pasos en total.`
     }
-    case 'sleep': {
+    case 'sleep':
+    case 'sleep_any': {
       const points = (record.dataPoints as Record<string, unknown>[] | undefined) ?? []
       if (!points.length) return 'Sin sesiones de sueño en el rango.'
       const first = points[0] as {
@@ -248,15 +249,27 @@ export async function probeGoogleHealth(token: string): Promise<ProbeCheck[]> {
   )
 
   const filter = encodeURIComponent(`sleep.interval.civil_end_time >= "${isoDay(-14)}"`)
-  checks.push(
-    await apiCall(
-      token,
-      'sleep',
-      'Sueño (reconcile)',
-      'GET',
-      `/users/me/dataTypes/sleep/dataPoints:reconcile?pageSize=5&filter=${filter}`,
-    ),
+  const sleepCheck = await apiCall(
+    token,
+    'sleep',
+    'Sueño (reconcile)',
+    'GET',
+    `/users/me/dataTypes/sleep/dataPoints:reconcile?pageSize=5&filter=${filter}`,
   )
+  checks.push(sleepCheck)
+
+  // Si el rango filtrado viene vacío, comprobamos si es que no hay datos o que el filtro no encaja.
+  const sleepPoints = (sleepCheck.data as { dataPoints?: unknown[] } | undefined)?.dataPoints
+  if (sleepCheck.ok && !sleepPoints?.length) {
+    const anySleep = await apiCall(
+      token,
+      'sleep_any',
+      'Sueño (sin filtro)',
+      'GET',
+      '/users/me/dataTypes/sleep/dataPoints:reconcile?pageSize=5',
+    )
+    checks.push(anySleep)
+  }
 
   return checks
 }

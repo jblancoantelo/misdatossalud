@@ -463,6 +463,79 @@ button:focus-visible {
   margin-bottom: 0.9rem;
 }
 
+/* --- filtro de fechas -------------------------------------------------- */
+
+.range-bar {
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
+  padding: 0.5rem 1rem;
+}
+
+.date-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.date-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.date-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.date-field input {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.28rem 0.45rem;
+}
+
+.date-field input:focus-visible {
+  outline: 2px solid var(--accent, #0d9488);
+  outline-offset: 1px;
+}
+
+.date-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.range-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .date-range {
+    gap: 0.5rem;
+  }
+
+  .date-count {
+    margin-left: 0;
+  }
+}
+
 /* --- tablas ----------------------------------------------------------- */
 
 .table-wrap {

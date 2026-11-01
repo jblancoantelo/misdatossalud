@@ -1,35 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { HealthStore } from '../../db/store'
-import { addDays, formatLongDate, formatMinutes, formatShortDate, formatTimeOfDay, toHours, todayISO } from '../../lib/date'
+import { formatLongDate, formatMinutes, formatShortDate, formatTimeOfDay, toHours } from '../../lib/date'
 import { num } from '../../lib/format'
 import { average, fillByDate } from '../../lib/series'
 import { AXIS_LABEL, AXIS_LINE, Chart, PALETTE, SPLIT_LINE, TOOLTIP } from '../Chart'
-import { Card, Empty, RangePicker, Section, StatGrid } from '../components'
+import { Card, Empty, Section, StatGrid, type DateRange } from '../components'
 
 interface ViewProps {
   store: HealthStore
   version: number
+  range: DateRange
 }
-
-const RANGES = [
-  { value: 30, label: '30 noches' },
-  { value: 90, label: '90 noches' },
-]
 
 const STAGE_Y: Record<string, number> = { DEEP: 0, LIGHT: 1, REM: 2, WAKE: 3, AWAKE: 3 }
 
-export function SleepView({ store, version }: ViewProps) {
-  const [range, setRange] = useState(30)
+export function SleepView({ store, version, range }: ViewProps) {
+  const { from, to } = range
 
   const data = useMemo(() => {
-    const to = todayISO()
-    const from = addDays(to, -(range - 1))
     const nights = store.getSleepNights(from, to)
     const last = nights.length ? nights[nights.length - 1] : null
     const hypnogram = last ? store.getHypnogram(last.date) : []
     return { to, from, nights, last, hypnogram, aligned: fillByDate(from, to, nights) }
-  }, [store, version, range])
+  }, [store, version, from, to])
 
   const totals = data.aligned.map((entry) => entry.row?.totalMin ?? null)
   const avgMin = average(totals)
@@ -159,10 +153,6 @@ export function SleepView({ store, version }: ViewProps) {
 
   return (
     <>
-      <div className="view-head">
-        <RangePicker value={range} options={RANGES} onChange={setRange} />
-      </div>
-
       <StatGrid>
         <Card label="Media por noche" value={toHours(avgMin)?.toLocaleString('es-ES') ?? '—'} unit=" h" hint={`${data.nights.length} noches`} />
         <Card label="Sueño profundo" value={formatMinutes(deepAvg)} hint="media por noche" />

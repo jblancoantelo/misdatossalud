@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
+import { addDays, daysBetween, todayISO } from '../lib/date'
 
 export function Card({
   label,
@@ -88,6 +90,105 @@ export function RangePicker<T extends string | number>({
           {option.label}
         </button>
       ))}
+    </div>
+  )
+}
+
+export interface DateRange {
+  from: string
+  to: string
+}
+
+const PRESETS = [
+  { days: 7, label: '7 días' },
+  { days: 30, label: '30 días' },
+  { days: 90, label: '90 días' },
+  { days: 365, label: '1 año' },
+]
+
+export function DateRangePicker({
+  from,
+  to,
+  min,
+  max,
+  onChange,
+}: {
+  from: string
+  to: string
+  min?: string | null
+  max?: string | null
+  onChange: (range: DateRange) => void
+}) {
+  const [draftFrom, setDraftFrom] = useState(from)
+  const [draftTo, setDraftTo] = useState(to)
+
+  useEffect(() => {
+    setDraftFrom(from)
+    setDraftTo(to)
+  }, [from, to])
+
+  function apply(nextFrom: string, nextTo: string) {
+    if (!nextFrom || !nextTo) return
+    const ordered = nextFrom <= nextTo ? [nextFrom, nextTo] : [nextTo, nextFrom]
+    setDraftFrom(ordered[0])
+    setDraftTo(ordered[1])
+    onChange({ from: ordered[0], to: ordered[1] })
+  }
+
+  const today = todayISO()
+  const isPreset = (days: number) => to === today && from === addDays(today, -(days - 1))
+  const isAll = Boolean(min) && from === min && to === (max ?? today)
+  const days = daysBetween(from, to) + 1
+
+  return (
+    <div className="date-range" role="group" aria-label="Periodo de fechas">
+      <div className="range">
+        {PRESETS.map((preset) => (
+          <button
+            key={preset.days}
+            type="button"
+            className={isPreset(preset.days) ? 'range-btn active' : 'range-btn'}
+            aria-pressed={isPreset(preset.days)}
+            onClick={() => apply(addDays(today, -(preset.days - 1)), today)}
+          >
+            {preset.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={isAll ? 'range-btn active' : 'range-btn'}
+          aria-pressed={isAll}
+          disabled={!min}
+          onClick={() => apply(min ?? '2000-01-01', max ?? today)}
+        >
+          Todo
+        </button>
+      </div>
+      <div className="date-fields">
+        <label className="date-field">
+          <span>Desde</span>
+          <input
+            type="date"
+            value={draftFrom}
+            min={min ?? undefined}
+            max={draftTo}
+            onChange={(event) => apply(event.target.value, draftTo)}
+          />
+        </label>
+        <label className="date-field">
+          <span>Hasta</span>
+          <input
+            type="date"
+            value={draftTo}
+            min={draftFrom}
+            max={today}
+            onChange={(event) => apply(draftFrom, event.target.value)}
+          />
+        </label>
+        <span className="date-count muted small">
+          {days === 1 ? '1 día' : `${days} días`}
+        </span>
+      </div>
     </div>
   )
 }

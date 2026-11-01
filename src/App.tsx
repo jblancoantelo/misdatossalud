@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSession } from './state/useSession'
+import { addDays, todayISO } from './lib/date'
 import { LockScreen } from './ui/LockScreen'
-import { Callout } from './ui/components'
+import { Callout, DateRangePicker, type DateRange } from './ui/components'
 import { OverviewView } from './ui/views/OverviewView'
 import { ActivityView } from './ui/views/ActivityView'
 import { SleepView } from './ui/views/SleepView'
@@ -25,6 +26,15 @@ type TabId = (typeof TABS)[number]['id']
 export default function App() {
   const session = useSession()
   const [tab, setTab] = useState<TabId>('resumen')
+  const [range, setRange] = useState<DateRange>(() => {
+    const today = todayISO()
+    return { from: addDays(today, -89), to: today }
+  })
+  const overall = useMemo(() => {
+    const store = session.store
+    if (!store) return { first: null as string | null, last: null as string | null }
+    return store.getOverallRange()
+  }, [session.store, session.version])
 
   if (session.status === 'loading') {
     return (
@@ -80,6 +90,17 @@ export default function App() {
             </button>
           ))}
         </nav>
+        {tab !== 'ajustes' ? (
+          <div className="range-bar">
+            <DateRangePicker
+              from={range.from}
+              to={range.to}
+              min={overall.first}
+              max={overall.last}
+              onChange={setRange}
+            />
+          </div>
+        ) : null}
       </header>
 
       <main className="content">
@@ -93,12 +114,12 @@ export default function App() {
         ) : null}
         {session.error ? <Callout tone="danger">{session.error}</Callout> : null}
 
-        {tab === 'resumen' ? <OverviewView store={store} version={session.version} /> : null}
-        {tab === 'actividad' ? <ActivityView store={store} version={session.version} /> : null}
-        {tab === 'sueno' ? <SleepView store={store} version={session.version} /> : null}
-        {tab === 'corazon' ? <HeartView store={store} version={session.version} /> : null}
-        {tab === 'deporte' ? <SportView store={store} version={session.version} /> : null}
-        {tab === 'cuerpo' ? <BodyView store={store} version={session.version} /> : null}
+        {tab === 'resumen' ? <OverviewView store={store} version={session.version} range={range} /> : null}
+        {tab === 'actividad' ? <ActivityView store={store} version={session.version} range={range} /> : null}
+        {tab === 'sueno' ? <SleepView store={store} version={session.version} range={range} /> : null}
+        {tab === 'corazon' ? <HeartView store={store} version={session.version} range={range} /> : null}
+        {tab === 'deporte' ? <SportView store={store} version={session.version} range={range} /> : null}
+        {tab === 'cuerpo' ? <BodyView store={store} version={session.version} range={range} /> : null}
         {tab === 'ajustes' ? (
           <SettingsView store={store} version={session.version} session={session} />
         ) : null}

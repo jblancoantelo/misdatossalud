@@ -1,33 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { HealthStore } from '../../db/store'
-import { addDays, formatShortDate, todayISO } from '../../lib/date'
+import { daysBetween, formatShortDate } from '../../lib/date'
 import { num } from '../../lib/format'
 import { fillByDate } from '../../lib/series'
 import { AXIS_LABEL, AXIS_LINE, Chart, PALETTE, SPLIT_LINE, TOOLTIP } from '../Chart'
-import { Card, Empty, RangePicker, Section, StatGrid } from '../components'
+import { Card, Empty, Section, StatGrid, type DateRange } from '../components'
 
 interface ViewProps {
   store: HealthStore
   version: number
+  range: DateRange
 }
 
-const RANGES = [
-  { value: 7, label: '7 días' },
-  { value: 30, label: '30 días' },
-  { value: 90, label: '90 días' },
-]
-
-export function HeartView({ store, version }: ViewProps) {
-  const [range, setRange] = useState(7)
+export function HeartView({ store, version, range }: ViewProps) {
+  const { from, to } = range
 
   const data = useMemo(() => {
-    const to = todayISO()
-    const from = addDays(to, -(range - 1))
     const days = store.getHeartDays(from, to)
     const hourly = store.getHourlyHeart(from, to)
     return { to, from, days, hourly, aligned: fillByDate(from, to, days) }
-  }, [store, version, range])
+  }, [store, version, from, to])
 
   const samples = data.days.reduce((total, day) => total + day.samples, 0)
   const weighted =
@@ -138,15 +131,11 @@ export function HeartView({ store, version }: ViewProps) {
 
   return (
     <>
-      <div className="view-head">
-        <RangePicker value={range} options={RANGES} onChange={setRange} />
-      </div>
-
       <StatGrid>
         <Card label="Media" value={num(weighted)} unit=" ppm" hint={`${num(samples)} muestras`} />
         <Card label="Mínima" value={num(min)} unit=" ppm" hint="valor puntual más bajo" />
         <Card label="Máxima" value={num(max)} unit=" ppm" hint="valor puntual más alto" />
-        <Card label="Días con registro" value={num(data.days.length)} hint={`de ${range} días`} />
+        <Card label="Días con registro" value={num(data.days.length)} hint={`de ${daysBetween(from, to) + 1} días`} />
       </StatGrid>
 
       <Section title="Mínima, media y máxima por día">

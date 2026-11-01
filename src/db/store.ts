@@ -484,7 +484,14 @@ export class HealthStore {
     }))
   }
 
-  getBodyMeasurements(limit = 400): BodyMeasurement[] {
+  getBodyMeasurements(limit = 400, from?: string, to?: string): BodyMeasurement[] {
+    const params: SqlValue[] = []
+    let where = ''
+    if (from && to) {
+      where = 'WHERE date BETWEEN ? AND ?'
+      params.push(from, to)
+    }
+    params.push(limit)
     return this.all<{
       ts: number
       date: string
@@ -500,9 +507,10 @@ export class HealthStore {
       `SELECT ts, date, weight_kg, bmi, fat_rate, body_water_rate, muscle_rate,
               visceral_fat, bone_mass_kg, metabolism
          FROM body_measurement
+         ${where}
         ORDER BY ts DESC
         LIMIT ?`,
-      [limit],
+      params,
     )
       .map((row) => ({
         ts: row.ts,
@@ -533,7 +541,7 @@ export class HealthStore {
 
   // --- resumen semanal ---------------------------------------------------
 
-  private periodStats(from: string, to: string): PeriodStats {
+  periodStats(from: string, to: string): PeriodStats {
     const activity = this.one<{
       n: number
       total: number | null

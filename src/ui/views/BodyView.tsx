@@ -4,16 +4,21 @@ import type { HealthStore } from '../../db/store'
 import { formatShortDate } from '../../lib/date'
 import { num } from '../../lib/format'
 import { AXIS_LABEL, AXIS_LINE, Chart, PALETTE, SPLIT_LINE, TOOLTIP } from '../Chart'
-import { Card, DataTable, Empty, Section, StatGrid } from '../components'
+import { Card, DataTable, Empty, Section, StatGrid, type DateRange } from '../components'
 
 interface ViewProps {
   store: HealthStore
   version: number
+  range: DateRange
 }
 
-export function BodyView({ store, version }: ViewProps) {
-  const rows = useMemo(() => store.getBodyMeasurements(500), [store, version])
-  const latest = rows.length ? rows[rows.length - 1] : null
+export function BodyView({ store, version, range }: ViewProps) {
+  const { from, to } = range
+  const rows = useMemo(
+    () => store.getBodyMeasurements(500, from, to),
+    [store, version, from, to],
+  )
+  const latest = rows.length ? rows[0] : null
 
   const option = useMemo<EChartsCoreOption>(() => {
     const withWeight = rows.filter((row) => row.weightKg != null)
@@ -76,8 +81,9 @@ export function BodyView({ store, version }: ViewProps) {
 
   if (!rows.length) {
     return (
-      <Empty title="Sin medidas corporales">
-        El export de Zepp incluye peso y composición corporal si usas báscula o los registras a mano.
+      <Empty title="Sin medidas corporales en este periodo">
+        Amplía el rango de fechas. El export de Zepp incluye peso y composición corporal si usas
+        báscula o los registras a mano.
       </Empty>
     )
   }
@@ -97,7 +103,7 @@ export function BodyView({ store, version }: ViewProps) {
 
       <Section title="Últimas medidas">
         <DataTable
-          rows={[...rows].reverse()}
+          rows={rows}
           getKey={(row) => row.ts}
           max={20}
           columns={[

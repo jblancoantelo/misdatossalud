@@ -1,32 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { EChartsCoreOption } from 'echarts/core'
 import type { HealthStore } from '../../db/store'
 import { sportLabel } from '../../db/store'
-import { addDays, formatDateTime, formatMinutes, todayISO } from '../../lib/date'
+import { daysBetween, formatDateTime, formatMinutes } from '../../lib/date'
 import { km, num, pace } from '../../lib/format'
 import { AXIS_LABEL, AXIS_LINE, Chart, PALETTE, SPLIT_LINE, TOOLTIP } from '../Chart'
-import { Card, DataTable, Empty, RangePicker, Section, StatGrid } from '../components'
+import { Card, DataTable, Empty, Section, StatGrid, type DateRange } from '../components'
 
 interface ViewProps {
   store: HealthStore
   version: number
+  range: DateRange
 }
 
-const RANGES = [
-  { value: 90, label: '90 días' },
-  { value: 365, label: '1 año' },
-  { value: 0, label: 'Todo' },
-]
-
-export function SportView({ store, version }: ViewProps) {
-  const [range, setRange] = useState(90)
+export function SportView({ store, version, range }: ViewProps) {
+  const { from, to } = range
 
   const data = useMemo(() => {
-    const to = todayISO()
-    const from = range > 0 ? addDays(to, -(range - 1)) : undefined
     const sessions = store.getSports(1000, from, to)
     return { sessions, to }
-  }, [store, version, range])
+  }, [store, version, from, to])
 
   const totalMinutes = data.sessions.reduce((total, session) => total + (session.durationS ?? 0) / 60, 0)
   const totalDistance = data.sessions.reduce((total, session) => total + (session.distanceM ?? 0), 0)
@@ -104,12 +97,8 @@ export function SportView({ store, version }: ViewProps) {
 
   return (
     <>
-      <div className="view-head">
-        <RangePicker value={range} options={RANGES} onChange={setRange} />
-      </div>
-
       <StatGrid>
-        <Card label="Sesiones" value={num(data.sessions.length)} hint={range > 0 ? `últimos ${range} días` : 'histórico completo'} />
+        <Card label="Sesiones" value={num(data.sessions.length)} hint={`${daysBetween(from, to) + 1} días`} />
         <Card label="Tiempo" value={formatMinutes(totalMinutes)} hint="tiempo total" />
         <Card label="Distancia" value={km(totalDistance)} hint="suma de sesiones" />
         <Card label="Calorías" value={num(totalCalories)} unit=" kcal" hint="suma de sesiones" />
