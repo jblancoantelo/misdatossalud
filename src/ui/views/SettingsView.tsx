@@ -4,8 +4,9 @@ import type { SessionApi } from '../../state/useSession'
 import { importZeppArchive, type ImportProgress, type ImportResult } from '../../import/zepp'
 import { estimateQuota, snapshotSize, storageBackend, type StorageBackend } from '../../db/storage'
 import { bytes, num } from '../../lib/format'
-import { formatLongDate } from '../../lib/date'
+import { formatLongDate, addDays, todayISO } from '../../lib/date'
 import { probeGoogleHealth, probeReport, requestAccessToken, type ProbeCheck } from '../../sync/googleHealth'
+import { syncGoogleHealth, type SyncProgress, type SyncResult } from '../../sync/googleHealthSync'
 import { Callout, Field, ProgressBar, Section, StatGrid, Card, DataTable } from '../components'
 
 interface ViewProps {
@@ -44,6 +45,12 @@ export function SettingsView({ store, version, session }: ViewProps) {
   const [probeBusy, setProbeBusy] = useState(false)
   const [checks, setChecks] = useState<ProbeCheck[] | null>(null)
   const [probeError, setProbeError] = useState<string | null>(null)
+
+  const [syncDays, setSyncDays] = useState(30)
+  const [syncing, setSyncing] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   const [confirmDelete, setConfirmDelete] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -114,6 +121,32 @@ export function SettingsView({ store, version, session }: ViewProps) {
       setProbeError(cause instanceof Error ? cause.message : 'La prueba falló.')
     } finally {
       setProbeBusy(false)
+    }
+  }
+
+  async function runSync() {
+    if (!clientId.trim()) {
+      setSyncError('Pega primero el ID de cliente OAuth de Google Cloud.')
+      return
+    }
+    setSyncing(true)
+    setSyncError(null)
+    setSyncResult(null)
+    setSyncProgress({ phase: 'steps', label: 'Preparando…' })
+    try {
+      store.setMeta('google_client_id', clientId.trim())
+      const token = await requestAccessToken(clientId.trim())
+      const to = todayISO()
+      const from = addDays(to, -(syncDays - 1))
+      const synced = await syncGoogleHealth(store, token.token, { from, to }, setSyncProgress)
+      setSyncResult(synced)
+      session.touch()
+      await session.saveNow()
+    } catch (cause) {
+      setSyncError(cause instanceof Error ? cause.message : 'La sincronización falló.')
+    } finally {
+      setSyncing(false)
+      setSyncProgress(null)
     }
   }
 
@@ -282,10 +315,11 @@ export function SettingsView({ store, version, session }: ViewProps) {
         </div>
       </Section>
 
-      <Section title="Google Health (prueba de viabilidad)">
+      <Section title="Google Health">
         <p className="muted">
-          Esta prueba comprueba si la Google Health API responde desde el navegador: OAuth, CORS y la
-          forma real de los datos. No guarda nada todavía en la base.
+          Descarga de Google Health los datos que llegan desde Health Connect y rellena solo los días
+          que falten. <strong>Zepp tiene prioridad</strong>: lo que ya está importado no se sobrescribe.
+          Hoy se sincronizan pasos y sueño.
         </p>
 
         <Callout tone="info">
@@ -305,49 +339,100 @@ export function SettingsView({ store, version, session }: ViewProps) {
           />
         </Field>
 
+        <Field label="Periodo a sincronizar" hint="Los días ya importados desde Zepp no se tocan.">
+          <div className="range" role="group" aria-label="Días a sincronizar">
+            {[7, 30, 90].map((days) => (
+              <button
+                key={days}
+                type="button"
+                className={syncDays === days ? 'range-btn active' : 'range-btn'}
+                aria-pressed={syncDays === days}
+                onClick={() => setSyncDays(days)}
+                disabled={syncing}
+              >
+                {days} días
+              </button>
+            ))}
+          </div>
+        </Field>
+
         <div className="row">
-          <button type="button" className="btn primary" onClick={() => void runProbe()} disabled={probeBusy}>
-            {probeBusy ? 'Conectando…' : 'Conectar y probar'}
+          <button type="button" className="btn primary" onClick={() => void runSync()} disabled={syncing}>
+            {syncing ? 'Sincronizando…' : 'Sincronizar ahora'}
           </button>
-          {checks ? (
+        </div>
+
+        {syncing && syncProgress ? (
+          <p className="muted small">{syncProgress.label}</p>
+        ) : null}
+
+        {syncError ? <Callout tone="danger">{syncError}</Callout> : null}
+
+        {syncResult ? (
+          <Callout tone="info">
+            Pasos: {num(syncResult.stepsAdded)} días nuevos de {num(syncResult.stepDays)} recibidos.
+            Sueño: {num(syncResult.sleepAdded)} noches nuevas de {num(syncResult.sleepNights)} recibidas.
+            {syncResult.warnings.length ? ` ${syncResult.warnings.join(' ')}` : ''}
+          </Callout>
+        ) : null}
+
+        <details className="probe">
+          <summary>
+            <strong>Diagnóstico de la API</strong>{' '}
+            <span className="muted small">(comprueba OAuth, CORS y la forma de las respuestas)</span>
+          </summary>
+          <p className="muted small">
+            No guarda nada en la base: solo consulta identidad, dispositivos, pasos y sueño.
+          </p>
+          <div className="row">
             <button
               type="button"
               className="btn ghost"
-              onClick={() => {
-                void navigator.clipboard?.writeText(probeReport(checks))
-              }}
+              onClick={() => void runProbe()}
+              disabled={probeBusy}
             >
-              Copiar informe
+              {probeBusy ? 'Conectando…' : 'Conectar y probar'}
             </button>
-          ) : null}
-        </div>
-
-        {probeError ? <Callout tone="danger">{probeError}</Callout> : null}
-
-        {checks ? (
-          <div className="probe">
-            {checks.map((check) => (
-              <details key={check.id} className={check.ok ? 'probe-item ok' : 'probe-item fail'}>
-                <summary>
-                  <span className={check.ok ? 'badge ok' : 'badge fail'}>
-                    {check.ok ? 'OK' : 'FALLO'}
-                  </span>
-                  <span className="probe-label">{check.label}</span>
-                  <span className="muted small">
-                    {check.status == null ? 'sin respuesta' : `HTTP ${check.status}`} · {check.ms} ms
-                  </span>
-                </summary>
-                <p className="small">{check.detail}</p>
-                <p className="mono small">
-                  {check.method} {check.url}
-                </p>
-                {check.raw ? (
-                  <pre className="code">{JSON.stringify(check.raw, null, 2).slice(0, 4000)}</pre>
-                ) : null}
-              </details>
-            ))}
+            {checks ? (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(probeReport(checks))
+                }}
+              >
+                Copiar informe
+              </button>
+            ) : null}
           </div>
-        ) : null}
+
+          {probeError ? <Callout tone="danger">{probeError}</Callout> : null}
+
+          {checks ? (
+            <div className="probe">
+              {checks.map((check) => (
+                <details key={check.id} className={check.ok ? 'probe-item ok' : 'probe-item fail'}>
+                  <summary>
+                    <span className={check.ok ? 'badge ok' : 'badge fail'}>
+                      {check.ok ? 'OK' : 'FALLO'}
+                    </span>
+                    <span className="probe-label">{check.label}</span>
+                    <span className="muted small">
+                      {check.status == null ? 'sin respuesta' : `HTTP ${check.status}`} · {check.ms} ms
+                    </span>
+                  </summary>
+                  <p className="small">{check.detail}</p>
+                  <p className="mono small">
+                    {check.method} {check.url}
+                  </p>
+                  {check.raw ? (
+                    <pre className="code">{JSON.stringify(check.raw, null, 2).slice(0, 4000)}</pre>
+                  ) : null}
+                </details>
+              ))}
+            </div>
+          ) : null}
+        </details>
       </Section>
 
       <Section title="Zona peligrosa">

@@ -87,6 +87,27 @@ Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tip
 
 **Riesgo asumido:** dependencia de una app de Google y de que acepte los datos de un dispositivo no-Fitbit vía Health Connect. Si esa cadena se rompe, la vía cloud deja de aportar datos. Por eso el importador de Zepp sigue siendo la fuente principal y Google Health solo rellena huecos.
 
+#### 2.2.2 Sincronización implementada (2026-11-02)
+
+`src/sync/googleHealthSync.ts` descarga y escribe en la base con estas reglas:
+
+| Aspecto | Decisión |
+|---|---|
+| Tipos soportados | Pasos diarios (`dailyRollUp`) y sesiones de sueño (`reconcile`) |
+| Prioridad | `INSERT OR IGNORE` sobre `daily_activity` y `sleep_session`: si Zepp ya tiene ese día, no se toca |
+| Tramos de pasos | Peticiones de 30 días (la API limita los rollups a 90) |
+| Paginación de sueño | 25 por página (máximo de la API), hasta 60 páginas |
+| Fecha de la noche | La del **despertar** (`civilEndTime`), igual que el CSV de Zepp |
+| Varias sesiones el mismo día | Se queda la más larga (sueño principal) |
+| Fases | `stagesSummary`; si falta, se calculan desde los tramos; si tampoco, `minutesAsleep` va a sueño ligero |
+| Filtro de sueño | `sleep.interval.civil_end_time >= "desde"` en crudo (sin doble codificación) |
+| Escritura | Red primero y después una única transacción: si falla una llamada no se escribe nada |
+| UI | Ajustes → Google Health: periodo de 7/30/90 días y botón «Sincronizar ahora» |
+
+**Verificado de extremo a extremo** con la cuenta de datos: la primera sincronización escribió **29 días de pasos** (2026-10-04 → 2026-11-01) y **0 noches** de sueño; la segunda no añadió nada (idempotente) y la base siguió en 29 filas.
+
+**Limitación conocida:** el sueño no llega a Google Health desde esta cuenta (ver 2.2.1), así que hoy la sincronización real aporta pasos. El importador de Zepp sigue siendo la fuente de sueño, frecuencia cardiaca, entrenamientos y cuerpo.
+
 ### 2.3 El ZIP de Zepp
 
 - El export oficial de Zepp genera un ZIP enviado por email (Ajustes → Seguridad y privacidad → Exportar datos), con rango de fechas y tipos de dato.
@@ -342,7 +363,7 @@ Siguen abiertos:
 - ~~Confirmar cobertura de sueño~~: **resuelto**; la sonda sin filtro también devuelve vacío y el dispositivo no anuncia `SLEEP`, así que Google Health no tiene sueño de esta cuenta. Siguiente paso: revisar los permisos de sueño en Health Connect en el móvil.
 - Renovación silenciosa de GIS y comportamiento si falla.
 - Tipos sin `list` (solo `rollUp`/`dailyRollUp`) y paginación de 25 en sueño/ejercicio.
-- Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`).
+- ~~Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`)~~: hecho para **pasos y sueño** (`src/sync/googleHealthSync.ts`); el resto de tipos queda pendiente de confirmar su forma.
 - Verificar si las sesiones de Zepp en Health Connect incluyen GPS y si `exportExerciseTcx` devuelve ruta.
 - Medir memoria y tiempo de desbloqueo en Android con el histórico completo.
 - Probar la instalación de la PWA en Android desde la URL publicada.

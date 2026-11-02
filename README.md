@@ -9,6 +9,7 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 ## Qué hace
 
 - **Importa el ZIP de exportación de Zepp** (las 11 carpetas de CSV) con una sola transacción e inserción idempotente.
+- **Sincroniza con Google Health** (Health Connect) los pasos diarios y las sesiones de sueño. Solo rellena los días que faltan: los datos de Zepp tienen prioridad y nunca se sobrescriben.
 - **Guarda todo en el navegador** con SQLite WASM en memoria y un snapshot cifrado en OPFS (o IndexedDB como reserva).
 - **Cifra con contraseña** usando AES-GCM-256 con clave derivada por PBKDF2-SHA256 (310.000 iteraciones).
 - **Funciona offline** tras la primera carga: el service worker precachea app, CSS y el binario de SQLite.
