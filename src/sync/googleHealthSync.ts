@@ -19,7 +19,7 @@ const STEP_WINDOW_DAYS = 30
 
 /** `sleep`/`exercise` tienen un máximo de 25 puntos por página. */
 const SLEEP_PAGE_SIZE = 25
-const SLEEP_MAX_PAGES = 60
+const SLEEP_MAX_PAGES = 200
 
 export interface SyncRange {
   from: string

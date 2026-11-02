@@ -521,6 +521,30 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.sync-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sync-custom input {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.28rem 0.45rem;
+  width: 6.5rem;
+}
+
+.sync-custom input:focus-visible {
+  outline: 2px solid var(--accent, #0d9488);
+  outline-offset: 1px;
+}
+
 .range-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;

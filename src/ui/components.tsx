@@ -100,6 +100,7 @@ export interface DateRange {
 }
 
 const PRESETS = [
+  { days: 1, label: 'Hoy' },
   { days: 7, label: '7 días' },
   { days: 30, label: '30 días' },
   { days: 90, label: '90 días' },

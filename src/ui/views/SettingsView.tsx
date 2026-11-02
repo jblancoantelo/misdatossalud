@@ -15,6 +15,9 @@ interface ViewProps {
   session: SessionApi
 }
 
+/** Tope de días por sincronización (10 años): más que eso no aporta y multiplica peticiones. */
+const MAX_SYNC_DAYS = 3650
+
 const BACKEND_LABEL: Record<StorageBackend, string> = {
   opfs: 'OPFS (sistema de archivos privado del navegador)',
   indexeddb: 'IndexedDB',
@@ -47,6 +50,7 @@ export function SettingsView({ store, version, session }: ViewProps) {
   const [probeError, setProbeError] = useState<string | null>(null)
 
   const [syncDays, setSyncDays] = useState(30)
+  const [customDays, setCustomDays] = useState('30')
   const [syncing, setSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
@@ -171,6 +175,21 @@ export function SettingsView({ store, version, session }: ViewProps) {
         ? `${num(progress.rows)} filas importadas…`
         : 'Preparando…'
     : ''
+
+  function applyDays(raw: string) {
+    const digits = raw.replace(/\D/g, '').slice(0, 4)
+    if (!digits) {
+      setCustomDays('')
+      return
+    }
+    const parsed = Number(digits)
+    const clamped = Math.min(parsed, MAX_SYNC_DAYS)
+    setCustomDays(String(clamped))
+    if (clamped >= 1) setSyncDays(clamped)
+  }
+
+  const syncToday = todayISO()
+  const syncFrom = addDays(syncToday, -(syncDays - 1))
 
   return (
     <>
@@ -339,21 +358,53 @@ export function SettingsView({ store, version, session }: ViewProps) {
           />
         </Field>
 
-        <Field label="Periodo a sincronizar" hint="Los días ya importados desde Zepp no se tocan.">
+        <Field
+          label="Periodo a sincronizar"
+          hint="Los días ya importados desde Zepp no se tocan. Puedes elegir uno de los atajos o escribir cuántos días quieres."
+        >
           <div className="range" role="group" aria-label="Días a sincronizar">
-            {[7, 30, 90].map((days) => (
+            {[7, 30, 90, 365].map((days) => (
               <button
                 key={days}
                 type="button"
                 className={syncDays === days ? 'range-btn active' : 'range-btn'}
                 aria-pressed={syncDays === days}
-                onClick={() => setSyncDays(days)}
+                onClick={() => {
+                  setSyncDays(days)
+                  setCustomDays(String(days))
+                }}
                 disabled={syncing}
               >
-                {days} días
+                {days === 365 ? '1 año' : `${days} días`}
               </button>
             ))}
           </div>
+          <div className="sync-custom">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_SYNC_DAYS}
+              step={1}
+              value={customDays}
+              onChange={(event) => applyDays(event.target.value)}
+              placeholder={String(syncDays)}
+              disabled={syncing}
+              aria-label="Número de días a sincronizar"
+            />
+            <span className="muted small">
+              {syncDays} {syncDays === 1 ? 'día' : 'días'} · {syncFrom} → {syncToday}
+            </span>
+          </div>
+          {customDays === '0' ? (
+            <span className="field-hint">El mínimo es 1 día.</span>
+          ) : null}
+          {syncDays > 365 ? (
+            <span className="field-hint">
+              Son muchas peticiones seguidas: puede tardar varios minutos. Si algo falla, la base no se
+              modifica.
+            </span>
+          ) : null}
         </Field>
 
         <div className="row">

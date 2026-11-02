@@ -14,7 +14,7 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 - **Cifra con contraseña** usando AES-GCM-256 con clave derivada por PBKDF2-SHA256 (310.000 iteraciones).
 - **Funciona offline** tras la primera carga: el service worker precachea app, CSS y el binario de SQLite.
 - **Resumen semanal** con comparación frente a la semana anterior.
-- **Filtro de fechas global**: presets de 7/30/90 días, 1 año y todo el histórico, más dos campos *desde/hasta* para elegir un día o un intervalo concreto. Se aplica a todas las vistas y se mantiene al cambiar de pestaña.
+- **Filtro de fechas global**: presets de hoy, 7/30/90 días, 1 año y todo el histórico, más dos campos *desde/hasta* para elegir un día o un intervalo concreto. Se aplica a todas las vistas y se mantiene al cambiar de pestaña.
 - **Vistas**: Resumen, Actividad, Sueño (con hipnograma), Corazón, Deporte, Cuerpo y Ajustes.
 - **Copia de seguridad** en un fichero `.mdsalud` cifrado, descargable y restaurable en otro dispositivo.
 - **Tema claro/oscuro** según el sistema, en español.

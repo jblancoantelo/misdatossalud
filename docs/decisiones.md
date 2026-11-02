@@ -96,13 +96,13 @@ Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tip
 | Tipos soportados | Pasos diarios (`dailyRollUp`) y sesiones de sueño (`reconcile`) |
 | Prioridad | `INSERT OR IGNORE` sobre `daily_activity` y `sleep_session`: si Zepp ya tiene ese día, no se toca |
 | Tramos de pasos | Peticiones de 30 días (la API limita los rollups a 90) |
-| Paginación de sueño | 25 por página (máximo de la API), hasta 60 páginas |
+| Paginación de sueño | 25 por página (máximo de la API), hasta 200 páginas |
 | Fecha de la noche | La del **despertar** (`civilEndTime`), igual que el CSV de Zepp |
 | Varias sesiones el mismo día | Se queda la más larga (sueño principal) |
 | Fases | `stagesSummary`; si falta, se calculan desde los tramos; si tampoco, `minutesAsleep` va a sueño ligero |
 | Filtro de sueño | `sleep.interval.civil_end_time >= "desde"` en crudo (sin doble codificación) |
 | Escritura | Red primero y después una única transacción: si falla una llamada no se escribe nada |
-| UI | Ajustes → Google Health: periodo de 7/30/90 días y botón «Sincronizar ahora» |
+| UI | Ajustes → Google Health: atajos de 7/30/90 días y 1 año, campo libre de 1 a 3.650 días, y botón «Sincronizar ahora» |
 
 **Verificado de extremo a extremo** con la cuenta de datos: la primera sincronización escribió **29 días de pasos** (2026-10-04 → 2026-11-01) y **0 noches** de sueño; la segunda no añadió nada (idempotente) y la base siguió en 29 filas.
 
