@@ -211,7 +211,7 @@ src/
 
 Detalles que difieren del diseño inicial:
 
-- **No se usa SQLite WASM con VFS sobre OPFS.** La base vive en memoria (`sql.js`) y lo que se persiste en OPFS es el snapshot cifrado que devuelve `db.export()`. Es más simple, evita el VFS cifrado por bloques y mantiene el disco siempre cifrado. El coste es que abrir la app descifra y carga ~50 MB en memoria; medido en unos segundos.
+- **No se usa SQLite WASM con VFS sobre OPFS.** La base vive en memoria (`sql.js`) y lo que se persiste en OPFS es el snapshot cifrado que devuelve `db.export()`. Es más simple, evita el VFS cifrado por bloques y mantiene el disco siempre cifrado. El coste es que abrir la app descifra y carga ~50 MB en memoria; medido en ~0,3 s en escritorio con 933.198 filas.
 - **Autoguardado cada 4 s** si hay cambios pendientes, más en `pagehide` y `visibilitychange`.
 - **Formato `.mdsalud`**: cabecera JSON + `\n` + ciphertext. La cabecera (`v`, `alg`, `kdf`, `iter`, `salt`, `iv`) es el AAD, así que alterarla invalida el descifrado.
 - **Restaurar sustituye** la base del dispositivo; no hay merge, como estaba decidido.
@@ -328,7 +328,7 @@ Consecuencia de "bases independientes": el PC y el Android pueden mostrar datos 
 
 Resueltos durante la implementación:
 
-- ~~Rendimiento de ~930k filas~~: la importación completa tarda 3-4 s y el snapshot cifrado ocupa ~50 MB. Verificado en Chrome de escritorio; falta medir en Android.
+- ~~Rendimiento de ~930k filas~~: la importación completa tarda 3-4 s y el snapshot cifrado ocupa ~50 MB. **Medido en Chrome de escritorio (2026-11-02)**: 50,8 MB y 933.198 filas; abrir hasta la pantalla de bloqueo 0,3 s, desbloquear 0,3 s, consultar los 2.494 días del preset «Todo» 0,2 s y ~165 MB de heap JS. Falta medir en Android.
 - ~~Zona horaria~~: `ACTIVITY_MINUTE`/`HEARTRATE_AUTO` se interpretan en hora local del dispositivo; `SLEEP`/`SPORT`/`BODY` traen offset y se convierten a epoch. Las horas `>24` de algunos exports se normalizan con `Date`.
 - ~~Excluir `USER` del importador~~: se importa solo a la tabla `profile`, nunca como fila de datos.
 - ~~`base` de Vite y scope del service worker~~: configurados en `/misdatossalud/`.
