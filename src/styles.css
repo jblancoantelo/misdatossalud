@@ -652,6 +652,22 @@ button:focus-visible {
   cursor: pointer;
 }
 
+.update-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.86rem;
+}
+
+.update-banner span {
+  font-weight: 600;
+}
+
 .empty {
   text-align: center;
   padding: 2.5rem 1rem;

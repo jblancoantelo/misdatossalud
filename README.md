@@ -17,6 +17,7 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 - **Filtro de fechas global**: presets de hoy, 7/30/90 días, 1 año y todo el histórico, más dos campos *desde/hasta* para elegir un día o un intervalo concreto. Se aplica a todas las vistas y se mantiene al cambiar de pestaña.
 - **Vistas**: Resumen, Actividad, Sueño (con hipnograma), Corazón, Deporte, Cuerpo y Ajustes.
 - **Copia de seguridad** en un fichero `.mdsalud` cifrado, descargable y restaurable en otro dispositivo.
+- **Versión y actualizaciones**: en Ajustes se ve la versión instalada y su fecha de compilación, se puede buscar una versión nueva y descargarla con un botón (también aparece un aviso cuando el service worker tiene una actualización esperando).
 - **Tema claro/oscuro** según el sistema, en español.
 
 ## Privacidad

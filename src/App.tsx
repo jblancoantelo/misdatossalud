@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSession } from './state/useSession'
 import { addDays, todayISO } from './lib/date'
+import { downloadUpdate, usePwaUpdate } from './pwa/update'
 import { LockScreen } from './ui/LockScreen'
 import { Callout, DateRangePicker, type DateRange } from './ui/components'
 import { OverviewView } from './ui/views/OverviewView'
@@ -25,6 +26,7 @@ type TabId = (typeof TABS)[number]['id']
 
 export default function App() {
   const session = useSession()
+  const updateAvailable = usePwaUpdate()
   const [tab, setTab] = useState<TabId>('resumen')
   const [range, setRange] = useState<DateRange>(() => {
     const today = todayISO()
@@ -102,6 +104,19 @@ export default function App() {
           </div>
         ) : null}
       </header>
+
+      {updateAvailable ? (
+        <div className="update-banner" role="status">
+          <span>Hay una versión nueva de la app.</span>
+          <button
+            type="button"
+            className="btn primary small"
+            onClick={() => void downloadUpdate()}
+          >
+            Descargar la nueva versión
+          </button>
+        </div>
+      ) : null}
 
       <main className="content">
         {session.notice ? (

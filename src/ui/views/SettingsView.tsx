@@ -7,6 +7,8 @@ import { bytes, num } from '../../lib/format'
 import { formatLongDate, addDays, todayISO } from '../../lib/date'
 import { probeGoogleHealth, probeReport, requestAccessToken, type ProbeCheck } from '../../sync/googleHealth'
 import { syncGoogleHealth, type SyncProgress, type SyncResult } from '../../sync/googleHealthSync'
+import { APP_VERSION, BUILD_TIME, versionLabel } from '../../pwa/version'
+import { checkForUpdate, downloadUpdate, usePwaUpdate, type UpdateCheck } from '../../pwa/update'
 import { Callout, Field, ProgressBar, Section, StatGrid, Card, DataTable } from '../components'
 
 interface ViewProps {
@@ -55,6 +57,10 @@ export function SettingsView({ store, version, session }: ViewProps) {
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
+
+  const updateAvailable = usePwaUpdate()
+  const [checking, setChecking] = useState(false)
+  const [checkResult, setCheckResult] = useState<UpdateCheck | null>(null)
 
   const [confirmDelete, setConfirmDelete] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -154,6 +160,16 @@ export function SettingsView({ store, version, session }: ViewProps) {
     }
   }
 
+  async function runCheck() {
+    setChecking(true)
+    setCheckResult(null)
+    try {
+      setCheckResult(await checkForUpdate())
+    } finally {
+      setChecking(false)
+    }
+  }
+
   async function runDelete() {
     if (confirmDelete !== 'BORRAR') return
     setDeleting(true)
@@ -190,6 +206,10 @@ export function SettingsView({ store, version, session }: ViewProps) {
 
   const syncToday = todayISO()
   const syncFrom = addDays(syncToday, -(syncDays - 1))
+  const syncCategories = [
+    { label: 'pasos', added: syncResult?.stepsAdded ?? 0 },
+    { label: 'sueño', added: syncResult?.sleepAdded ?? 0 },
+  ]
 
   return (
     <>
@@ -421,6 +441,12 @@ export function SettingsView({ store, version, session }: ViewProps) {
 
         {syncResult ? (
           <Callout tone="info">
+            <strong>
+              {syncCategories.filter((category) => category.added > 0).length} de {syncCategories.length}{' '}
+              categorías con datos nuevos
+            </strong>{' '}
+            ({syncCategories.map((category) => category.label).join(' y ')} consultadas).
+            <br />
             Pasos: {num(syncResult.stepsAdded)} días nuevos de {num(syncResult.stepDays)} recibidos.
             Sueño: {num(syncResult.sleepAdded)} noches nuevas de {num(syncResult.sleepNights)} recibidas.
             {syncResult.warnings.length ? ` ${syncResult.warnings.join(' ')}` : ''}
@@ -509,10 +535,51 @@ export function SettingsView({ store, version, session }: ViewProps) {
         </div>
       </Section>
 
+      <Section title="Versión y actualizaciones">
+        <p className="muted small">
+          Versión instalada: <strong>{versionLabel(APP_VERSION, BUILD_TIME)}</strong>
+        </p>
+
+        <div className="row wrap">
+          <button type="button" className="btn" onClick={() => void runCheck()} disabled={checking}>
+            {checking ? 'Buscando…' : 'Buscar actualizaciones'}
+          </button>
+          {updateAvailable || checkResult?.status === 'update' ? (
+            <button type="button" className="btn primary" onClick={() => void downloadUpdate()}>
+              Descargar la nueva versión
+            </button>
+          ) : null}
+        </div>
+
+        {checking ? (
+          <p className="muted small">Comprobando si hay una versión nueva…</p>
+        ) : checkResult == null ? (
+          <p className="muted small">No verificado.</p>
+        ) : checkResult.status === 'current' ? (
+          <p className="muted small">
+            Tienes la última versión ({versionLabel(APP_VERSION, BUILD_TIME)}).
+          </p>
+        ) : checkResult.status === 'update' ? (
+          <Callout tone="info">
+            Nueva versión disponible
+            {checkResult.remote
+              ? `: ${versionLabel(checkResult.remote.version, checkResult.remote.buildTime)}`
+              : ''}
+            . Pulsa «Descargar la nueva versión» para instalarla y recargar.
+          </Callout>
+        ) : checkResult.status === 'error' ? (
+          <Callout tone="danger">No se pudo comprobar: {checkResult.message}</Callout>
+        ) : (
+          <p className="muted small">
+            Este navegador no tiene el service worker activo (en desarrollo no se registra).
+          </p>
+        )}
+      </Section>
+
       <Section title="Acerca de">
         <p className="muted small">
-          misdatossalud · versión 0.1.0 · licencia AGPL-3.0-only. Los datos de salud no salen del
-          dispositivo salvo las llamadas a APIs que autorices. No es un producto sanitario.
+          misdatossalud · versión {APP_VERSION} · licencia AGPL-3.0-only. Los datos de salud no salen
+          del dispositivo salvo las llamadas a APIs que autorices. No es un producto sanitario.
         </p>
         <p className="muted small">
           Código: <a href="https://github.com/jblancoantelo/misdatossalud">github.com/jblancoantelo/misdatossalud</a>

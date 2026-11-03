@@ -1,10 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { registerSW } from 'virtual:pwa-register'
+// Registra el service worker en modo prompt y expone el estado de actualización.
+import './pwa/update'
 import App from './App'
 import './styles.css'
-
-registerSW({ immediate: true })
 
 const container = document.getElementById('root')
 if (!container) throw new Error('Falta el elemento #root')

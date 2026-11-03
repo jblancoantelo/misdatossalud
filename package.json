@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "echarts": "^6.1.0",

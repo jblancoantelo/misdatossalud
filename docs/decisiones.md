@@ -186,6 +186,26 @@ Fuentes:
 - Para importar ficheros en Android: `<input type="file">` y **Web Share Target** (compartir el CSV/ZIP desde el gestor de archivos a la PWA instalada).
 - OPFS no es una copia de seguridad garantizada: el navegador puede desalojarla. Hay que ofrecer export/backup periódico.
 
+### 2.6 Versión y actualizaciones (2026-11-03)
+
+Se replica el flujo de `localizatugasolinera` adaptado a Vite + `vite-plugin-pwa`:
+
+| Aspecto | Decisión |
+|---|---|
+| Versión | `package.json` (`version`), inyectada en el bundle con `define` como `__APP_VERSION__` |
+| Fecha de compilación | `__BUILD_TIME__` con formato `YYYYMMDD-HHMMSS`, generada en cada build |
+| Publicación | El build emite `version.json` (`{ version, buildTime }`), fuera del precache |
+| Service worker | `registerType: 'prompt'`: la versión nueva queda en `waiting` hasta que el usuario la acepta |
+| Registro | `src/pwa/update.ts` con `registerSW({ immediate: true })`; `injectRegister: null` |
+| Buscar actualizaciones | Ajustes → Versión y actualizaciones: `registration.update()` + comparación de `version.json` |
+| Descargar | Botón «Descargar la nueva versión»: `applyUpdate(true)` (SKIP_WAITING + recarga) |
+| Aviso | Banner global cuando hay una versión esperando, con el mismo botón |
+| Subir versión | `npm run bump [patch\|minor\|major]` actualiza `package.json` y `package-lock.json` |
+
+**Verificado de extremo a extremo** en local: «Buscar actualizaciones» responde «Tienes la última versión»; con un `version.json` con otra compilación anuncia la nueva y muestra el botón; con una compilación real nueva el banner aparece, el botón descarga, recarga y el aviso desaparece.
+
+**Por qué no autoUpdate:** actualizar sin avisar puede recargar la app en mitad de una importación o dejar la base en una pestaña antigua. El modo prompt mantiene el control en el usuario, igual que en la app de gasolineras.
+
 ## 3. Arquitectura
 
 ```
