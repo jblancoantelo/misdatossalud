@@ -133,10 +133,22 @@ CREATE TABLE IF NOT EXISTS sport (
   avg_pace REAL,
   max_pace REAL,
   min_pace REAL,
+  label TEXT,
   source TEXT NOT NULL DEFAULT 'zepp',
   PRIMARY KEY (start_ts, type)
 );
 CREATE INDEX IF NOT EXISTS idx_sport_date ON sport (date);
+
+-- Métricas diarias que no tienen columna propia (pisos, minutos activos,
+-- oxígeno, VO2 máximo...). Se guardan como filas fecha + métrica.
+CREATE TABLE IF NOT EXISTS daily_metric (
+  date TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  value REAL,
+  source TEXT NOT NULL DEFAULT 'google',
+  PRIMARY KEY (date, metric)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_metric_date ON daily_metric (date);
 `
 
 /** Tablas de datos que se vacían al borrar el histórico. */
@@ -151,6 +163,7 @@ export const DATA_TABLES = [
   'sleep_session',
   'sleep_minute',
   'sport',
+  'daily_metric',
   'profile',
 ] as const
 

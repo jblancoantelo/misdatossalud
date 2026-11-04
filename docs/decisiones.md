@@ -93,20 +93,28 @@ Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tip
 
 | Aspecto | Decisión |
 |---|---|
-| Tipos soportados | Pasos diarios (`dailyRollUp`) y sesiones de sueño (`reconcile`) |
-| Prioridad | `INSERT OR IGNORE` sobre `daily_activity` y `sleep_session`: si Zepp ya tiene ese día, no se toca |
-| Tramos de pasos | Peticiones de 30 días (la API limita los rollups a 90) |
-| Paginación de sueño | 25 por página (máximo de la API), hasta 200 páginas |
-| Fecha de la noche | La del **despertar** (`civilEndTime`), igual que el CSV de Zepp |
-| Varias sesiones el mismo día | Se queda la más larga (sueño principal) |
-| Fases | `stagesSummary`; si falta, se calculan desde los tramos; si tampoco, `minutesAsleep` va a sueño ligero |
-| Filtro de sueño | `sleep.interval.civil_end_time >= "desde"` en crudo (sin doble codificación) |
+| Tipos soportados | 13 categorías: pasos, distancia, calorías activas, minutos activos, peso, altura, grasa corporal, frecuencia cardiaca, sueño, entrenamientos, pisos, oxígeno en sangre y VO2 máximo |
+| Prioridad | `INSERT OR IGNORE` sobre `daily_activity`, `sleep_session`, `heart_rate` y `sport`: si Zepp ya tiene ese día o esa muestra, no se toca |
+| Relleno de columnas | `fillGoogleDailyActivity` completa `distance_m`/`calories` con `COALESCE`, y **solo** en filas con `source = 'google'` (nunca en las de Zepp) |
+| Métricas sin columna propia | Tabla `daily_metric` (`date`, `metric`, `value`, `source`): pisos, minutos activos por nivel, oxígeno y VO2 máximo |
+| Tramos de pasos y rollups | Peticiones de 30 días (la API limita los rollups a 90) |
+| Paginación de puntos | 25 por página (máximo de la API), hasta 200 páginas |
+| Fecha de la noche | La del **despertar** (`civilEndTime`), igual que el CSV de Zepp; si falta, se usa la hora física convertida |
+| Varias sesiones de sueño el mismo día | Se queda la más larga (sueño principal) |
+| Fases del sueño | `stagesSummary`; si falta, se calculan desde los tramos; si tampoco, `minutesAsleep` va a sueño ligero |
+| Filtros de la API | En crudo dentro de `URLSearchParams` (sin doble codificación); filtros físicos con margen de un día y civiles con `>= desde AND < hasta+1` |
+| Unidades | Distancia mm → m, energía kcal, peso g → kg, altura mm → cm, oxígeno media diaria, VO2 último valor del día |
+| Entrenamientos | `sport` con PK `(start_ts, type)`; los tipos comunes se mapean a códigos Zepp y el nombre real se guarda en `sport.label` |
 | Escritura | Red primero y después una única transacción: si falla una llamada no se escribe nada |
+| Resultado | La UI muestra cuántas categorías trajeron datos y, por categoría, cuántos registros nuevos de cuántos recibidos |
 | UI | Ajustes → Google Health: atajos de 7/30/90 días y 1 año, campo libre de 1 a 3.650 días, y botón «Sincronizar ahora» |
 
-**Verificado de extremo a extremo** con la cuenta de datos: la primera sincronización escribió **29 días de pasos** (2026-10-04 → 2026-11-01) y **0 noches** de sueño; la segunda no añadió nada (idempotente) y la base siguió en 29 filas.
+**Verificado de extremo a extremo** con la cuenta de datos:
 
-**Limitación conocida:** el sueño no llega a Google Health desde esta cuenta (ver 2.2.1), así que hoy la sincronización real aporta pasos. El importador de Zepp sigue siendo la fuente de sueño, frecuencia cardiaca, entrenamientos y cuerpo.
+- Primera sincronización de 730 días: **7 de 13 categorías con datos nuevos** — pasos 545 de 574 recibidos, distancia 565, calorías activas 2, peso 2, altura 1, frecuencia cardiaca 7.278 muestras y minutos activos 2. Sin datos en grasa corporal, sueño, entrenamientos, pisos, oxígeno ni VO2 máximo.
+- Segunda sincronización de 30 días: **0 de 13 categorías con datos nuevos** (idempotente), con el aviso «No había huecos que rellenar: los datos de Zepp tienen prioridad».
+
+**Limitación conocida:** el sueño, los entrenamientos, los pisos, el oxígeno y el VO2 máximo no llegan a Google Health desde esta cuenta (ver 2.2.1). El código queda preparado y probado con datos sintéticos, pero no hay datos reales que validar. El importador de Zepp sigue siendo la fuente principal de sueño, frecuencia cardiaca, entrenamientos y cuerpo.
 
 ### 2.3 El ZIP de Zepp
 
@@ -206,6 +214,22 @@ Se replica el flujo de `localizatugasolinera` adaptado a Vite + `vite-plugin-pwa
 
 **Por qué no autoUpdate:** actualizar sin avisar puede recargar la app en mitad de una importación o dejar la base en una pestaña antigua. El modo prompt mantiene el control en el usuario, igual que en la app de gasolineras.
 
+### 2.7 Gráficas ampliables (2026-11-04)
+
+Cada gráfica de ECharts se puede abrir en un modal para analizarla con más detalle:
+
+| Aspecto | Decisión |
+|---|---|
+| Componente | `src/ui/Chart.tsx`: `ChartCanvas` (crear/actualizar/redimensionar) + `Chart` (marco con botón) |
+| Apertura | Botón flotante «⤢» sobre la esquina superior derecha de la gráfica (`aria-label="Ampliar: …"`) |
+| Modal | `<dialog>` nativo con `showModal()`: foco atrapado, fondo inerte y cierre con Escape gratis |
+| Cierre | Escape (evento `close` del diálogo) o botón «Cerrar» |
+| Tamaño | `min(1400px, 96vw)` × `min(900px, 92vh)`; el lienzo ocupa todo el cuerpo del diálogo |
+| Redimensionado | `ResizeObserver` en cada lienzo: al abrir el modal ECharts recalcula el tamaño real |
+| Montaje | El lienzo del modal solo se monta cuando está abierto, para no duplicar instancias de ECharts |
+
+**Verificado de extremo a extremo** en local: en Actividad aparecen dos botones «Ampliar»; al pulsar uno se abre el diálogo con el título correcto y un canvas de 717×369 px, y el botón «Cerrar» lo cierra.
+
 ## 3. Arquitectura
 
 ```
@@ -215,7 +239,7 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 ```
 
 - **Sin servidor**: todo el parseo y las consultas ocurren en el navegador.
-- **Origen por registro**: cada tabla lleva una columna `source` (`zepp`, `google_health`). Hoy solo escribe `zepp` el importador; `google_health` queda preparado para el importador definitivo.
+- **Origen por registro**: cada tabla lleva una columna `source` (`zepp`, `google_health`). Hoy escriben ambos importadores; las filas de Google nunca sobrescriben las de Zepp.
 - **Deduplicación**: regla fija **prioridad Zepp**; Google Health solo rellena huecos (`INSERT OR IGNORE`). La UI muestra la cobertura por tabla para que la diferencia sea visible.
 - **Backup**: copia cifrada de la base local; no es una exportación CSV/PDF para el usuario.
 
@@ -227,7 +251,7 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 | 2. Repo y scaffold Vite + React + TS + PWA | Hecho |
 | 3. Capa de datos: SQLite WASM + snapshot cifrado | Hecho |
 | 4. Importador Zepp CSV | Hecho (11 carpetas, transacción única, `INSERT OR REPLACE`) |
-| 5. Importador Google Health API | **No**: solo sonda de viabilidad |
+| 5. Importador Google Health API | Hecho: 13 categorías con prioridad Zepp, tabla `daily_metric` y resultado por categoría |
 | 6. Dashboard | Hecho: 7 vistas, filtro global de fechas (presets + desde/hasta), cobertura por tabla |
 | 7. Resumen semanal | Hecho, con comparación frente a la semana anterior |
 | 8. Backup local cifrado y recuperación | Hecho (descarga y restauración `.mdsalud`) |
@@ -238,16 +262,17 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 ```
 src/
   db/
-    schema.ts     10 tablas de datos + meta + profile, todas con columna source
+    schema.ts     11 tablas de datos + meta + profile, todas con columna source
     store.ts      HealthStore: inserción por lotes, consultas, resumen semanal, cobertura
     crypto.ts     AES-GCM-256 + PBKDF2-SHA256 (310.000 iteraciones), cabecera como AAD
     storage.ts    OPFS con reserva a IndexedDB
     session.ts    crear, abrir, guardar y nombrar el snapshot
     sqlLoader.ts  carga única de sql.js con el wasm servido desde el bundle
   import/zepp.ts  ZIP + CSV, mapeo por carpeta, timestamps UTC y locales
-  sync/googleHealth.ts  sonda OAuth + identidad, dispositivos, pasos, sueño
+  sync/googleHealth.ts  sonda OAuth + identidad, dispositivos y JSON crudo
+  sync/googleHealthSync.ts  sincronización de 13 categorías y mapeos a tablas
   state/useSession.ts   crear/desbloquear/bloquear/restaurar/descargar/autoguardado
-  ui/             LockScreen, Chart (ECharts) y vistas Resumen/Actividad/Sueño/Corazón/Deporte/Cuerpo/Ajustes
+  ui/             LockScreen, Chart (ECharts + modal) y vistas Resumen/Actividad/Sueño/Corazón/Deporte/Cuerpo/Ajustes
 ```
 
 Detalles que difieren del diseño inicial:
@@ -362,7 +387,7 @@ Consecuencia de "bases independientes": el PC y el Android pueden mostrar datos 
 | PAI | Métrica de Zepp no exportada | Omitir |
 | Temperatura de piel | Solo Pixel Watch 4/5 | No aplica |
 | Nutrición / hidratación | Solo si se registra en Google Health/Fitbit | Importar si existe |
-| SpO2 / HRV / respiración | La API los soporta; depende de HC → Google Health | Verificar en el spike |
+| SpO2 / HRV / respiración | La API los soporta; en esta cuenta `oxygen-saturation` no devuelve datos | Sincronizar si existen |
 | GPS / rutas | `SPORT` no trae GPS; la API puede dar TCX | Intentar; condicionado al spike |
 
 ### 5.5 Pendientes técnicos
@@ -383,7 +408,7 @@ Siguen abiertos:
 - ~~Confirmar cobertura de sueño~~: **resuelto**; la sonda sin filtro también devuelve vacío y el dispositivo no anuncia `SLEEP`, así que Google Health no tiene sueño de esta cuenta. Siguiente paso: revisar los permisos de sueño en Health Connect en el móvil.
 - Renovación silenciosa de GIS y comportamiento si falla.
 - Tipos sin `list` (solo `rollUp`/`dailyRollUp`) y paginación de 25 en sueño/ejercicio.
-- ~~Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`)~~: hecho para **pasos y sueño** (`src/sync/googleHealthSync.ts`); el resto de tipos queda pendiente de confirmar su forma.
+- ~~Escribir el importador definitivo de Google Health con prioridad Zepp (`INSERT OR IGNORE`)~~: hecho para **13 categorías** (`src/sync/googleHealthSync.ts`), con tabla `daily_metric` para las métricas sin columna propia y `sport.label` para el nombre del ejercicio.
 - Verificar si las sesiones de Zepp en Health Connect incluyen GPS y si `exportExerciseTcx` devuelve ruta.
 - Medir memoria y tiempo de desbloqueo en Android con el histórico completo.
 - Probar la instalación de la PWA en Android desde la URL publicada.

@@ -115,7 +115,7 @@ export function SportView({ store, version, range }: ViewProps) {
           max={200}
           columns={[
             { key: 'date', label: 'Fecha', render: (row) => formatDateTime(row.startTs) },
-            { key: 'type', label: 'Tipo', render: (row) => sportLabel(row.type) },
+            { key: 'type', label: 'Tipo', render: (row) => row.label ?? sportLabel(row.type) },
             {
               key: 'duration',
               label: 'Duración',

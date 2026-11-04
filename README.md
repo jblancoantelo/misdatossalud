@@ -4,18 +4,18 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 
 **App publicada:** https://jblancoantelo.github.io/misdatossalud/
 
-> **Estado:** funcional y desplegada. Importa el export completo de Zepp, cifra la base con contraseña y muestra resumen, actividad, sueño, frecuencia cardiaca, entrenamientos y cuerpo, con filtro global de fechas. La integración con Google Health está **validada de extremo a extremo**: OAuth, CORS y pasos reales desde Health Connect. El sueño **no llega** a Google Health desde esta cuenta (la API no tiene sesiones); queda confirmar frecuencia cardiaca y entrenamientos.
+> **Estado:** funcional y desplegada. Importa el export completo de Zepp, cifra la base con contraseña y muestra resumen, actividad, sueño, frecuencia cardiaca, entrenamientos y cuerpo, con filtro global de fechas. La integración con Google Health está **validada de extremo a extremo**: OAuth, CORS y sincronización de 13 categorías. En esta cuenta la API solo devuelve pasos, distancia, calorías activas, minutos activos, peso, altura y frecuencia cardiaca; el sueño, los entrenamientos, los pisos, el oxígeno y el VO2 máximo no llegan desde Health Connect.
 
 ## Qué hace
 
 - **Importa el ZIP de exportación de Zepp** (las 11 carpetas de CSV) con una sola transacción e inserción idempotente.
-- **Sincroniza con Google Health** (Health Connect) los pasos diarios y las sesiones de sueño. Solo rellena los días que faltan: los datos de Zepp tienen prioridad y nunca se sobrescriben.
+- **Sincroniza con Google Health** (Health Connect) hasta 13 categorías: pasos, distancia, calorías activas, minutos activos, peso, altura, grasa corporal, frecuencia cardiaca, sueño, entrenamientos, pisos, oxígeno en sangre y VO2 máximo. Solo rellena los huecos: los datos de Zepp tienen prioridad y nunca se sobrescriben. Al terminar indica cuántas categorías trajeron datos nuevos y el desglose por categoría.
 - **Guarda todo en el navegador** con SQLite WASM en memoria y un snapshot cifrado en OPFS (o IndexedDB como reserva).
 - **Cifra con contraseña** usando AES-GCM-256 con clave derivada por PBKDF2-SHA256 (310.000 iteraciones).
 - **Funciona offline** tras la primera carga: el service worker precachea app, CSS y el binario de SQLite.
 - **Resumen semanal** con comparación frente a la semana anterior.
 - **Filtro de fechas global**: presets de hoy, 7/30/90 días, 1 año y todo el histórico, más dos campos *desde/hasta* para elegir un día o un intervalo concreto. Se aplica a todas las vistas y se mantiene al cambiar de pestaña.
-- **Vistas**: Resumen, Actividad, Sueño (con hipnograma), Corazón, Deporte, Cuerpo y Ajustes.
+- **Vistas**: Resumen, Actividad, Sueño (con hipnograma), Corazón, Deporte, Cuerpo y Ajustes. Las gráficas se pueden ampliar a un modal para analizarlas con más detalle.
 - **Copia de seguridad** en un fichero `.mdsalud` cifrado, descargable y restaurable en otro dispositivo.
 - **Versión y actualizaciones**: en Ajustes se ve la versión instalada y su fecha de compilación, se puede buscar una versión nueva y descargarla con un botón (también aparece un aviso cuando el service worker tiene una actualización esperando).
 - **Tema claro/oscuro** según el sistema, en español.
@@ -70,11 +70,31 @@ src/
 docs/        decisiones y arquitectura
 ```
 
-## Google Health (prueba de viabilidad)
+## Google Health
 
-La vista de Ajustes permite pegar un Client ID OAuth de Google Cloud y lanzar cuatro comprobaciones contra `health.googleapis.com`: identidad, dispositivos emparejados, pasos diarios (`dailyRollUp`) y sesiones de sueño (`reconcile`). Muestra el estado HTTP, la latencia, un resumen y el JSON crudo de cada llamada.
+La vista de Ajustes permite pegar un Client ID OAuth de Google Cloud, probar la conexión y sincronizar el histórico que elijas (de 1 a 3.650 días). La sincronización descarga **13 categorías** y las escribe en una única transacción: si una llamada falla, la base no se modifica.
 
-Sirve para confirmar antes de escribir la sincronización definitiva: que el flujo implícito de Google Identity Services funciona, que la API responde con CORS desde el navegador y qué forma tienen los datos reales. **No guarda nada en la base todavía.**
+| Categoría | Origen en la API | Destino |
+|---|---|---|
+| Pasos | `steps` (`dailyRollUp`) | `daily_activity.steps` |
+| Distancia | `distance` (`dailyRollUp`) | `daily_activity.distance_m` |
+| Calorías activas | `active-energy-burned` (`dailyRollUp`) | `daily_activity.calories` |
+| Minutos activos | `active-minutes` (`dailyRollUp` por nivel) | `daily_metric` |
+| Peso | `weight` | `body_measurement.weight_kg` |
+| Altura | `height` | `body_measurement.height_cm` |
+| Grasa corporal | `body-fat` | `body_measurement.fat_rate` |
+| Frecuencia cardiaca | `heart-rate` | `heart_rate` |
+| Sueño | `sleep` (`reconcile`) | `sleep_session` |
+| Entrenamientos | `exercise` | `sport` (con `label`) |
+| Pisos | `floors` | `daily_metric` |
+| Oxígeno en sangre | `oxygen-saturation` | `daily_metric` (media diaria) |
+| VO2 máximo | `vo2-max` | `daily_metric` |
+
+Reglas de convivencia con Zepp:
+
+- `INSERT OR IGNORE`: un día o una muestra que ya existe desde Zepp no se toca.
+- Las columnas que pueden faltar en una fila de Google se completan con `COALESCE`, y solo si esa fila es de origen `google`.
+- Las métricas sin columna propia van a `daily_metric` (`date`, `metric`, `value`, `source`).
 
 Requisitos: cliente OAuth de tipo *aplicación web* con el origen autorizado, Google Health API habilitada y los scopes `googlehealth.{activity_and_fitness,health_metrics_and_measurements,sleep,location,profile}.readonly`. Al ser una app sin verificar, Google mostrará el aviso de «Google no ha verificado esta aplicación».
 

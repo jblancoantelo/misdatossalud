@@ -33,13 +33,14 @@ export const TOOLTIP = {
   confine: true,
 }
 
-interface ChartProps {
+interface ChartCanvasProps {
   option: EChartsCoreOption
-  height?: number
+  height?: number | string
   ariaLabel?: string
 }
 
-export function Chart({ option, height = 260, ariaLabel }: ChartProps) {
+/** Lienzo ECharts reutilizable: se encarga de crear, actualizar y redimensionar. */
+function ChartCanvas({ option, height = 260, ariaLabel }: ChartCanvasProps) {
   const host = useRef<HTMLDivElement>(null)
   const instance = useRef<ReturnType<typeof echarts.init> | null>(null)
 
@@ -69,6 +70,73 @@ export function Chart({ option, height = 260, ariaLabel }: ChartProps) {
       role="img"
       aria-label={ariaLabel ?? 'gráfico de datos'}
     />
+  )
+}
+
+interface ChartProps {
+  option: EChartsCoreOption
+  height?: number
+  ariaLabel?: string
+  /** Permite ocultar el botón de ampliar en gráficos auxiliares. */
+  expandable?: boolean
+}
+
+export function Chart({ option, height = 260, ariaLabel, expandable = true }: ChartProps) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const element = dialog.current
+    if (!element) return
+    if (expanded) {
+      if (!element.open) element.showModal()
+      setMounted(true)
+    } else {
+      setMounted(false)
+      if (element.open) element.close()
+    }
+  }, [expanded])
+
+  useEffect(() => {
+    const element = dialog.current
+    if (!element) return
+    const onClose = () => setExpanded(false)
+    element.addEventListener('close', onClose)
+    return () => element.removeEventListener('close', onClose)
+  }, [])
+
+  const label = ariaLabel ?? 'gráfico de datos'
+
+  return (
+    <>
+      <div className="chart-frame">
+        <ChartCanvas option={option} height={height} ariaLabel={ariaLabel} />
+        {expandable ? (
+          <button
+            type="button"
+            className="chart-expand"
+            onClick={() => setExpanded(true)}
+            aria-label={`Ampliar: ${label}`}
+            title="Ampliar gráfico"
+          >
+            ⤢
+          </button>
+        ) : null}
+      </div>
+
+      <dialog ref={dialog} className="chart-dialog" aria-label={`${label} (ampliado)`}>
+        <div className="chart-dialog-head">
+          <strong>{label}</strong>
+          <button type="button" className="btn ghost" onClick={() => setExpanded(false)}>
+            Cerrar
+          </button>
+        </div>
+        <div className="chart-dialog-body">
+          {mounted ? <ChartCanvas option={option} height="100%" ariaLabel={ariaLabel} /> : null}
+        </div>
+      </dialog>
+    </>
   )
 }
 

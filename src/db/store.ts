@@ -20,6 +20,7 @@ export interface Coverage {
   sleepMinutes: CoverageEntry
   sport: CoverageEntry
   body: CoverageEntry
+  metrics: CoverageEntry
 }
 
 export interface DailyActivity {
@@ -28,6 +29,13 @@ export interface DailyActivity {
   distanceM: number | null
   runDistanceM: number | null
   calories: number | null
+  source: string
+}
+
+export interface DailyMetric {
+  date: string
+  metric: string
+  value: number
 }
 
 export interface SleepNight {
@@ -58,12 +66,14 @@ export interface SportSession {
   distanceM: number | null
   calories: number | null
   avgPace: number | null
+  label: string | null
 }
 
 export interface BodyMeasurement {
   ts: number
   date: string
   weightKg: number | null
+  heightCm: number | null
   bmi: number | null
   fatRate: number | null
   bodyWaterRate: number | null
@@ -178,9 +188,20 @@ export class HealthStore {
 
   private migrate(): void {
     this.db.exec(SCHEMA_SQL)
+    this.ensureColumn('sport', 'label', 'TEXT')
     const current = Number(this.getMeta('schema_version') ?? 0)
     if (current !== SCHEMA_VERSION) {
       this.setMeta('schema_version', String(SCHEMA_VERSION))
+    }
+  }
+
+  /** Añade columnas nuevas a bases de datos creadas con un esquema anterior. */
+  private ensureColumn(table: string, column: string, definition: string): void {
+    const result = this.db.exec(`PRAGMA table_info(${table})`)
+    if (!result.length) return
+    const names = result[0].values.map((row) => String(row[1]))
+    if (!names.includes(column)) {
+      this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
     }
   }
 
@@ -253,17 +274,19 @@ export class HealthStore {
   /**
    * Inserta filas por lotes con una única sentencia multi-fila preparada.
    * `replace` da prioridad al dato nuevo (Zepp); `ignore` solo rellena huecos.
+   * Devuelve cuántas filas se insertaron realmente.
    */
   insertBatch(
     table: string,
     columns: string[],
     rows: SqlValue[][],
     mode: InsertMode = 'replace',
-  ): void {
-    if (!rows.length) return
+  ): number {
+    if (!rows.length) return 0
     const cache = statementCache(this.db)
     const perStatement = Math.max(1, Math.min(200, Math.floor(900 / columns.length)))
     const verb = mode === 'replace' ? 'INSERT OR REPLACE' : 'INSERT OR IGNORE'
+    let inserted = 0
 
     for (let offset = 0; offset < rows.length; offset += perStatement) {
       const chunk = rows.slice(offset, offset + perStatement)
@@ -283,7 +306,9 @@ export class HealthStore {
         for (let i = 0; i < columns.length; i += 1) flat.push(row[i] ?? null)
       }
       stmt.run(flat)
+      inserted += this.db.getRowsModified()
     }
+    return inserted
   }
 
   // --- cobertura y perfiles ---------------------------------------------
@@ -309,6 +334,7 @@ export class HealthStore {
       sleepMinutes: this.coverageOf('sleep_minute', 'date'),
       sport: this.coverageOf('sport', 'date'),
       body: this.coverageOf('body_measurement', 'date'),
+      metrics: this.coverageOf('daily_metric', 'date'),
     }
   }
 
@@ -355,8 +381,9 @@ export class HealthStore {
       distance_m: number | null
       run_distance_m: number | null
       calories: number | null
+      source: string
     }>(
-      `SELECT date, steps, distance_m, run_distance_m, calories
+      `SELECT date, steps, distance_m, run_distance_m, calories, source
          FROM daily_activity
         WHERE date BETWEEN ? AND ?
         ORDER BY date`,
@@ -367,7 +394,36 @@ export class HealthStore {
       distanceM: asNumber(row.distance_m),
       runDistanceM: asNumber(row.run_distance_m),
       calories: asNumber(row.calories),
+      source: row.source,
     }))
+  }
+
+  /**
+   * Rellena columnas vacías de un día ya sincronizado desde Google. Nunca toca
+   * filas de Zepp: solo actualiza filas cuyo origen es `google`.
+   */
+  fillGoogleDailyActivity(
+    date: string,
+    values: { steps: number | null; distanceM: number | null; calories: number | null },
+  ): void {
+    this.run(
+      `UPDATE daily_activity
+          SET steps = COALESCE(steps, ?),
+              distance_m = COALESCE(distance_m, ?),
+              calories = COALESCE(calories, ?)
+        WHERE date = ? AND source = 'google'`,
+      [values.steps, values.distanceM, values.calories, date],
+    )
+  }
+
+  getDailyMetrics(from: string, to: string): DailyMetric[] {
+    return this.all<{ date: string; metric: string; value: number }>(
+      `SELECT date, metric, value
+         FROM daily_metric
+        WHERE date BETWEEN ? AND ? AND value IS NOT NULL
+        ORDER BY date`,
+      [from, to],
+    )
   }
 
   getSleepNights(from: string, to: string): SleepNight[] {
@@ -466,8 +522,9 @@ export class HealthStore {
       distance_m: number | null
       calories: number | null
       avg_pace: number | null
+      label: string | null
     }>(
-      `SELECT start_ts, date, type, duration_s, distance_m, calories, avg_pace
+      `SELECT start_ts, date, type, duration_s, distance_m, calories, avg_pace, label
          FROM sport
          ${where}
         ORDER BY start_ts DESC
@@ -481,6 +538,7 @@ export class HealthStore {
       distanceM: asNumber(row.distance_m),
       calories: asNumber(row.calories),
       avgPace: asNumber(row.avg_pace),
+      label: asText(row.label),
     }))
   }
 
@@ -496,6 +554,7 @@ export class HealthStore {
       ts: number
       date: string
       weight_kg: number | null
+      height_cm: number | null
       bmi: number | null
       fat_rate: number | null
       body_water_rate: number | null
@@ -504,7 +563,7 @@ export class HealthStore {
       bone_mass_kg: number | null
       metabolism: number | null
     }>(
-      `SELECT ts, date, weight_kg, bmi, fat_rate, body_water_rate, muscle_rate,
+      `SELECT ts, date, weight_kg, height_cm, bmi, fat_rate, body_water_rate, muscle_rate,
               visceral_fat, bone_mass_kg, metabolism
          FROM body_measurement
          ${where}
@@ -516,6 +575,7 @@ export class HealthStore {
         ts: row.ts,
         date: row.date,
         weightKg: asNumber(row.weight_kg),
+        heightCm: asNumber(row.height_cm),
         bmi: asNumber(row.bmi),
         fatRate: asNumber(row.fat_rate),
         bodyWaterRate: asNumber(row.body_water_rate),

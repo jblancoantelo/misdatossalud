@@ -206,10 +206,9 @@ export function SettingsView({ store, version, session }: ViewProps) {
 
   const syncToday = todayISO()
   const syncFrom = addDays(syncToday, -(syncDays - 1))
-  const syncCategories = [
-    { label: 'pasos', added: syncResult?.stepsAdded ?? 0 },
-    { label: 'sueño', added: syncResult?.sleepAdded ?? 0 },
-  ]
+  const syncCategories = syncResult?.categories ?? []
+  const syncCategoriesWithData = syncCategories.filter((category) => category.received > 0)
+  const syncCategoriesAdded = syncCategories.filter((category) => category.added > 0).length
 
   return (
     <>
@@ -250,6 +249,7 @@ export function SettingsView({ store, version, session }: ViewProps) {
             { key: 'sleepMinutes', label: 'Sueño por minuto', entry: coverage.sleepMinutes },
             { key: 'sport', label: 'Entrenamientos', entry: coverage.sport },
             { key: 'body', label: 'Cuerpo', entry: coverage.body },
+            { key: 'metrics', label: 'Métricas diarias', entry: coverage.metrics },
           ]}
           getKey={(row) => row.key}
           columns={[
@@ -442,14 +442,32 @@ export function SettingsView({ store, version, session }: ViewProps) {
         {syncResult ? (
           <Callout tone="info">
             <strong>
-              {syncCategories.filter((category) => category.added > 0).length} de {syncCategories.length}{' '}
-              categorías con datos nuevos
-            </strong>{' '}
-            ({syncCategories.map((category) => category.label).join(' y ')} consultadas).
-            <br />
-            Pasos: {num(syncResult.stepsAdded)} días nuevos de {num(syncResult.stepDays)} recibidos.
-            Sueño: {num(syncResult.sleepAdded)} noches nuevas de {num(syncResult.sleepNights)} recibidas.
+              {syncCategoriesAdded} de {syncCategories.length} categorías con datos nuevos
+            </strong>
+            {syncCategoriesWithData.length ? (
+              <>
+                <br />
+                {syncCategoriesWithData.map((category, index) => (
+                  <span key={category.key}>
+                    {index > 0 ? ' · ' : ''}
+                    {category.label}: {num(category.added)}{' '}
+                    {category.added === 1 ? 'nuevo' : 'nuevos'} de {num(category.received)}{' '}
+                    {category.received === 1 ? 'recibido' : 'recibidos'}
+                  </span>
+                ))}
+                .
+              </>
+            ) : (
+              <>
+                <br />
+                La API no devolvió datos de ningún tipo en este periodo.
+              </>
+            )}
             {syncResult.warnings.length ? ` ${syncResult.warnings.join(' ')}` : ''}
+            <br />
+            <span className="muted small">
+              Consultado: {syncCategories.map((category) => category.label).join(', ')}.
+            </span>
           </Callout>
         ) : null}
 

@@ -5,7 +5,7 @@ import { formatShortDate } from '../../lib/date'
 import { km, num } from '../../lib/format'
 import { average, fillByDate, movingAverage, sum } from '../../lib/series'
 import { AXIS_LABEL, AXIS_LINE, Chart, PALETTE, SPLIT_LINE, TOOLTIP } from '../Chart'
-import { Card, Empty, Section, StatGrid, type DateRange } from '../components'
+import { Card, DataTable, Empty, Section, StatGrid, type DateRange } from '../components'
 
 interface ViewProps {
   store: HealthStore
@@ -18,7 +18,63 @@ export function ActivityView({ store, version, range }: ViewProps) {
 
   const data = useMemo(() => {
     const rows = store.getDailyActivity(from, to)
-    return { to, from, rows, aligned: fillByDate(from, to, rows) }
+    const metrics = store.getDailyMetrics(from, to)
+    const metricsByDate = new Map<string, Record<string, number>>()
+    for (const metric of metrics) {
+      const bucket = metricsByDate.get(metric.date) ?? {}
+      bucket[metric.metric] = metric.value
+      metricsByDate.set(metric.date, bucket)
+    }
+    const metricDates = [...metricsByDate.keys()].sort()
+    const latestMetric = (key: string) => {
+      for (let index = metricDates.length - 1; index >= 0; index -= 1) {
+        const value = metricsByDate.get(metricDates[index])?.[key]
+        if (value != null) return value
+      }
+      return null
+    }
+    const latestActiveMinutes = (() => {
+      for (let index = metricDates.length - 1; index >= 0; index -= 1) {
+        const bucket = metricsByDate.get(metricDates[index])
+        if (!bucket) continue
+        const total = ['light', 'moderate', 'vigorous'].reduce(
+          (sum, level) => sum + (bucket[`active_minutes_${level}`] ?? 0),
+          0,
+        )
+        if (total > 0) return total
+      }
+      return null
+    })()
+    const recentMetrics = metricDates
+      .slice(-14)
+      .reverse()
+      .map((date) => {
+        const bucket = metricsByDate.get(date) ?? {}
+        return {
+          date,
+          floors: bucket.floors ?? null,
+          activeMinutes: ['light', 'moderate', 'vigorous'].reduce(
+            (sum, level) => sum + (bucket[`active_minutes_${level}`] ?? 0),
+            0,
+          ),
+          oxygen: bucket.oxygen_saturation ?? null,
+          vo2: bucket.vo2_max ?? null,
+        }
+      })
+    return {
+      to,
+      from,
+      rows,
+      aligned: fillByDate(from, to, rows),
+      metrics: {
+        count: metrics.length,
+        floors: latestMetric('floors'),
+        activeMinutes: latestActiveMinutes,
+        oxygen: latestMetric('oxygen_saturation'),
+        vo2: latestMetric('vo2_max'),
+        recent: recentMetrics,
+      },
+    }
   }, [store, version, from, to])
 
   const steps = data.aligned.map((entry) => entry.row?.steps ?? null)
@@ -148,6 +204,45 @@ export function ActivityView({ store, version, range }: ViewProps) {
       <Section title="Distancia y calorías">
         <Chart option={distanceOption} height={280} ariaLabel="Distancia y calorías diarias" />
       </Section>
+
+      {data.metrics.count ? (
+        <Section title="Otras métricas (Google Health)">
+          <StatGrid>
+            <Card label="Pisos" value={num(data.metrics.floors, 0)} hint="último día" />
+            <Card
+              label="Minutos activos"
+              value={num(data.metrics.activeMinutes, 0)}
+              unit=" min"
+              hint="último día"
+            />
+            <Card label="Oxígeno" value={num(data.metrics.oxygen, 0)} unit=" %" hint="media diaria" />
+            <Card label="VO2 máximo" value={num(data.metrics.vo2, 1)} hint="último registro" />
+          </StatGrid>
+
+          <DataTable
+            rows={data.metrics.recent}
+            getKey={(row) => row.date}
+            max={14}
+            columns={[
+              { key: 'date', label: 'Fecha', render: (row) => formatShortDate(row.date) },
+              { key: 'floors', label: 'Pisos', align: 'right', render: (row) => num(row.floors) },
+              {
+                key: 'active',
+                label: 'Min. activos',
+                align: 'right',
+                render: (row) => num(row.activeMinutes),
+              },
+              {
+                key: 'oxygen',
+                label: 'Oxígeno',
+                align: 'right',
+                render: (row) => `${num(row.oxygen, 0)} %`,
+              },
+              { key: 'vo2', label: 'VO2 máx', align: 'right', render: (row) => num(row.vo2, 1) },
+            ]}
+          />
+        </Section>
+      ) : null}
     </>
   )
 }

@@ -18,7 +18,15 @@ export function BodyView({ store, version, range }: ViewProps) {
     () => store.getBodyMeasurements(500, from, to),
     [store, version, from, to],
   )
-  const latest = rows.length ? rows[0] : null
+  const latest = useMemo(
+    () => (rows.length ? rows.reduce((a, b) => (a.ts > b.ts ? a : b)) : null),
+    [rows],
+  )
+  const latestHeight = useMemo(() => {
+    const withHeight = rows.filter((row) => row.heightCm != null)
+    return withHeight.length ? withHeight[withHeight.length - 1].heightCm : null
+  }, [rows])
+  const recent = useMemo(() => [...rows].sort((a, b) => b.ts - a.ts), [rows])
 
   const option = useMemo<EChartsCoreOption>(() => {
     const withWeight = rows.filter((row) => row.weightKg != null)
@@ -92,6 +100,7 @@ export function BodyView({ store, version, range }: ViewProps) {
     <>
       <StatGrid>
         <Card label="Peso" value={num(latest?.weightKg, 1)} unit=" kg" hint={latest ? formatShortDate(latest.date) : undefined} />
+        <Card label="Altura" value={num(latestHeight, 0)} unit=" cm" hint="último registro" />
         <Card label="IMC" value={num(latest?.bmi, 1)} hint="último registro" />
         <Card label="Grasa corporal" value={num(latest?.fatRate, 1)} unit=" %" hint="último registro" />
         <Card label="Masa muscular" value={num(latest?.muscleRate, 1)} unit=" %" hint="último registro" />
@@ -103,7 +112,7 @@ export function BodyView({ store, version, range }: ViewProps) {
 
       <Section title="Últimas medidas">
         <DataTable
-          rows={rows}
+          rows={recent}
           getKey={(row) => row.ts}
           max={20}
           columns={[
