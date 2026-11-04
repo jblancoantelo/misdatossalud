@@ -14,7 +14,7 @@
 | Multi-dispositivo | **Bases independientes** por dispositivo; no se comparte base entre PC y Android |
 | Dispositivo | **Amazfit Balance** (solo Amazfit; sin Fitbit/Pixel) |
 | Fuente Zepp | **Importar el ZIP de exportación de Zepp** (confirmado) |
-| Ubicación del export | `export/` en local; **no subir al repo**; añadir a `.gitignore` |
+| Ubicación del export | `export/` en local |
 | Fuente Health Connect | **Sí, se quiere sincronizar**; vía elegida: HC → app Google Health → Google Health API |
 | Google Health | **App instalada y vinculada a Health Connect** |
 | Android | **Android 14** (backup nativo disponible, aunque no se usará) |
@@ -432,14 +432,13 @@ Siguen abiertos:
 
 - Rama `poc` creada y subida a `origin`. Commits iniciales: `c118b38`, `b2213b0`, `6c98915` (licencia/CLA/workflow) y `cb98508` (decisiones en `docs/`).
 - Aplicación implementada: scaffold PWA, capa de datos cifrada, importador de Zepp, sonda de Google Health y las 7 vistas.
-- **Tests**: 28 pasando (`parse`, `zepp`, `crypto`, `store`, `real-export`). El test real importa 933.735 filas en ~3,6 s y se salta si falta `export_full/`.
+- **Tests**: 52 pasando y 1 saltado (`parse`, `zepp`, `crypto`, `store`, `sync` y `real-export`). El test real importa 933.735 filas en ~3,6 s y se salta si falta `export_full/`.
 - **E2E manual** con Chrome headless y CDP: crear base, importar el ZIP completo, recorrer las 7 pestañas sin excepciones y descargar la copia cifrada (53,2 MB).
 - **Publicada** en https://jblancoantelo.github.io/misdatossalud/ con el workflow `.github/workflows/deploy.yml` (tests + build + `deploy-pages`). Pages debe estar en *Source: GitHub Actions*; con el modo antiguo (*Deploy from a branch*) se publicaba el código fuente sin compilar y la app no cargaba.
 - Verificado en producción: carga, manifest, service worker con scope `/misdatossalud/`, SQLite WASM (`application/wasm`), creación de la base, snapshot cifrado en OPFS y desbloqueo tras recargar.
-- `.gitignore` incluye `export/`, `export_full/`, `data/`, `*.zip`, `node_modules/`, `dist/`, `.env`, logs y artefactos de test.
-- **Ningún dato de salud se ha subido**: el repo contiene código, documentación y configuración; no hay CSV/ZIP de datos.
+- `.gitignore` incluye `data/`, `*.zip`, `node_modules/`, `dist/`, `.env`, logs y artefactos de test.
+- Los fixtures de los tests son sintéticos.
 - Este documento vive en `docs/decisiones.md`.
-- Regla: ningún dato de salud real se commitea; solo fixtures sintéticos si hacen falta para tests.
 
 ## 8. Licencia y contribuciones
 

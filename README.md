@@ -24,7 +24,6 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 
 - Sin backend propio: los datos no salen del dispositivo salvo las llamadas a las APIs que autorices.
 - La base vive en memoria mientras está desbloqueada; en disco solo hay un snapshot cifrado.
-- No se suben datos de salud al repositorio: `export/` y `export_full/` están en `.gitignore`.
 - Si pierdes la contraseña, los datos no se pueden recuperar: no hay servidor ni puerta trasera.
 
 ## Cómo funciona el cifrado
@@ -101,6 +100,7 @@ Requisitos: cliente OAuth de tipo *aplicación web* con el origen autorizado, Go
 ## Documentación
 
 - [Decisiones y arquitectura](docs/decisiones.md)
+- [Guía para agentes](AGENTS.md): cómo trabajar, probar de extremo a extremo y desplegar
 
 ## Licencia
 
