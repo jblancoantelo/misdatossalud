@@ -60,7 +60,8 @@ export default defineConfig({
         start_url: '.',
         scope: '.',
         display: 'standalone',
-        orientation: 'portrait',
+        // Permite girar el móvil: el CSS adapta la interfaz en horizontal.
+        orientation: 'any',
         background_color: '#0b0f14',
         theme_color: '#0f766e',
         icons: [

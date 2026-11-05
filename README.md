@@ -19,6 +19,7 @@ PWA local-first para consultar tus datos de salud de Amazfit/Zepp y Health Conne
 - **Copia de seguridad** en un fichero `.mdsalud` cifrado, descargable y restaurable en otro dispositivo.
 - **Versión y actualizaciones**: en Ajustes se ve la versión instalada y su fecha de compilación, se puede buscar una versión nueva y descargarla con un botón (también aparece un aviso cuando el service worker tiene una actualización esperando).
 - **Tema claro/oscuro** según el sistema, en español.
+- **Modo apaisado**: la app se puede girar en el móvil y, en horizontal, aprovecha el ancho con tarjetas compactas, dos columnas y el modal de gráficas casi a pantalla completa.
 
 ## Privacidad
 

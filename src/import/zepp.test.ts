@@ -55,7 +55,7 @@ async function buildZip(): Promise<Blob> {
   zip.file(
     'USER/USER_1.csv',
     csv('userId,gender,height,weight,nickName,avatar,birthday', [
-      '123,1,175.0,74.0,Pocholo,https://example.com/a.jpg,1983-07',
+      '123,1,170.0,70.0,Prueba,https://example.com/a.jpg,1990-01',
     ]),
   )
   const bytes = await zip.generateAsync({ type: 'uint8array' })
@@ -98,7 +98,7 @@ describe('importZeppArchive', () => {
     expect(body[0].visceralFat).toBeNull()
 
     const profile = store.getProfile()
-    expect(profile?.nickname).toBe('Pocholo')
+    expect(profile?.nickname).toBe('Prueba')
 
     const heart = store.getHeartDays('2026-01-01', '2026-01-02')
     expect(heart[0].min).toBe(60)

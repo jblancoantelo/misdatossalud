@@ -34,7 +34,8 @@ npm run bump minor # sube versión en package.json y package-lock.json
 
 Notas del entorno Windows de este repo:
 
-- Si `npm` no está en el `PATH`, invócalo así:
+- Si `npm` no está en el `PATH`, invócalo con la ruta de tu instalación de Node (en Windows, por
+  defecto `C:\Program Files\nodejs`):
   `& "C:\Program Files\nodejs\node.exe" "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run build`
 - npm escribe un warning en stderr (`Unknown user config "allow-scripts"`). PowerShell lo trata como
   error y devuelve **código de salida 1 aunque el comando haya ido bien**. Fíjate en la salida
@@ -196,6 +197,12 @@ datos reales para validarlo**. No lo borres: la cuenta puede empezar a recibirlo
 - Componentes compartidos en `src/ui/components.tsx`: `Section`, `Card`, `StatGrid`, `DataTable`,
   `Empty`, `Field`, `Callout`, `DateRangePicker`.
 - Todo el texto de interfaz va en **español**, con `aria-label` en botones icónicos.
+- **Modo apaisado**: el manifest declara `orientation: 'any'` para poder girar el móvil. En
+  `@media (orientation: landscape)` hay dos bloques: uno para pantallas anchas (contenido hasta
+  1400 px) y otro para poca altura (≤600 px) con tarjetas compactas, `.two-col` en dos columnas y
+  el modal de gráficas al 98 % del viewport. En móviles estrechos (≤700 px) `.two-col` vuelve a una
+  columna. Si tocas el layout, comprueba horizontal **y** vertical: las gráficas se redimensionan
+  solas por el `ResizeObserver`.
 
 ---
 
@@ -231,20 +238,19 @@ Es la forma de comprobar OPFS, cifrado, OAuth y service worker como en producci�
 
 | Dato | Valor |
 |---|---|
-| Chrome | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
-| Perfil CDP | `D:\Temp\TempUser\opencode\chrome-juan` |
+| Chrome | instalación estándar de Chrome en Windows (`chrome.exe`) |
+| Perfil CDP | carpeta temporal propia, fuera del repo (por ejemplo `<carpeta-de-pruebas>/chrome-profile`) |
 | Puerto CDP | `9226` |
 | App local | `http://localhost:4173/misdatossalud/` |
 | App producción | `https://jblancoantelo.github.io/misdatossalud/` |
-| Contraseña de pruebas | `contrasena-de-prueba` |
-| Client ID OAuth | `513900864660-96de8i95n6o7d2gib6n1cgc25l0q5s5o.apps.googleusercontent.com` |
-| Cuenta Google | `juan.movilandroid@gmail.com` |
+| Base de pruebas | se crea al vuelo con una contraseña local; **no se documenta** |
+| OAuth | el Client ID que ya esté guardado en Ajustes o uno propio de Google Cloud |
 
 Arranque:
 
 ```powershell
-$profile = "D:\Temp\TempUser\opencode\chrome-juan"
-$chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+$profile = "<carpeta-de-pruebas>/chrome-profile"
+$chrome = "<ruta-de-chrome>/chrome.exe"
 Start-Process -FilePath $chrome -ArgumentList "--headless=new","--disable-gpu","--no-first-run","--remote-debugging-port=9226","--user-data-dir=$profile","about:blank" -WindowStyle Hidden
 ```
 
@@ -258,24 +264,25 @@ npm run preview -- --port 4173 --strictPort
    al `webSocketDebuggerUrl`.
 2. `Network.enable` + `Network.setBypassServiceWorker { bypass: true }` y navega a
    `APP + '?v=' + Date.now()`. **Sin el bypass, el service worker sirve el precache antiguo.**
-3. Si aparece «Desbloquear», escribe la contraseña con el setter nativo de React y
+3. Si aparece «Desbloquear», escribe la contraseña de esa base con el setter nativo de React y
    `form.requestSubmit()`; espera a que aparezca «Bloquear».
 4. Navega con `[...document.querySelectorAll('nav button')].find(b => b.textContent.trim() === 'Ajustes').click()`.
 5. Para OAuth: pulsa «Sincronizar ahora», espera la ventana emergente de `accounts.google.com`
-   (búscala en `/json/list`), pulsa `[data-email="juan.movilandroid@gmail.com"]` y, si sale el aviso,
+   (búscala en `/json/list`), pulsa la cuenta de pruebas (`[data-email]`) y, si sale el aviso,
    en este orden: «Configuración avanzada» → «no seguro» → «Continuar» → «Permitir».
 6. Espera el texto «categorías con datos nuevos» en el cuerpo de la app.
 
-Scripts ya escritos (reutilízalos como plantilla):
+Scripts de referencia (viven fuera del repo, en la carpeta de pruebas; no se versionan):
 
 | Script | Qué hace |
 |---|---|
-| `D:\Temp\TempUser\opencode\sync-full-e2e.mjs` | sync larga + desglose + vistas + modal |
-| `D:\Temp\TempUser\opencode\sync-again.mjs` | segunda sync corta para comprobar idempotencia |
-| `D:\Temp\TempUser\opencode\diag-todo.mjs` | preset «Todo» y vistas Corazón/Actividad |
-| `D:\Temp\TempUser\opencode\probe-types3.mjs` | sonda de rollups/reconcile de tipos extra |
-| `D:\Temp\TempUser\opencode\prod-check.mjs` | versión y textos nuevos en producción |
-| `D:\Temp\TempUser\opencode\diag-views.mjs` | recorrido por todas las pestañas |
+| `sync-full-e2e.mjs` | sync larga + desglose + vistas + modal |
+| `sync-again.mjs` | segunda sync corta para comprobar idempotencia |
+| `diag-todo.mjs` | preset «Todo» y vistas Corazón/Actividad |
+| `probe-types3.mjs` | sonda de rollups/reconcile de tipos extra |
+| `prod-check.mjs` | versión y textos nuevos en producción |
+| `diag-views.mjs` | recorrido por todas las pestañas |
+| `landscape2.mjs` | modo apaisado con `Emulation.setDeviceMetricsOverride` |
 
 Consejos:
 

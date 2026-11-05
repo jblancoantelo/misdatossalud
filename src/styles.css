@@ -1021,3 +1021,82 @@ button:focus-visible {
     flex-wrap: wrap;
   }
 }
+
+/* --- modo apaisado ------------------------------------------------------ */
+
+/*
+ * La PWA se puede girar (`orientation: any` en el manifest). En horizontal se
+ * aprovecha el ancho: contenido más ancho, tarjetas compactas y el modal de las
+ * gráficas casi a pantalla completa.
+ */
+@media (orientation: landscape) and (min-width: 900px) {
+  .topbar-inner,
+  .tabs,
+  .content {
+    max-width: 1400px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .topbar-inner {
+    padding: 0.3rem 1rem 0.15rem;
+  }
+
+  .tabs {
+    padding-bottom: 0.3rem;
+  }
+
+  .content {
+    padding: 0.6rem 1rem 2rem;
+  }
+
+  .section {
+    margin-bottom: 1rem;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .card {
+    padding: 0.65rem 0.8rem;
+  }
+
+  .stat-value {
+    font-size: 1.3rem;
+  }
+
+  /* Dos columnas para que las gráficas quepan sin scroll vertical. */
+  .two-col {
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1rem;
+  }
+
+  .chart-dialog {
+    width: 98vw;
+    height: 94vh;
+    max-width: 98vw;
+    max-height: 94vh;
+  }
+
+  .chart-dialog-body {
+    padding: 0.25rem;
+  }
+
+  .lock {
+    padding: 0.75rem;
+  }
+
+  .lock-card {
+    max-width: 520px;
+    padding: 1.1rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) and (max-width: 700px) {
+  /* Móvil pequeño girado: mejor una columna que dos gráficas diminutas. */
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}

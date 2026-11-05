@@ -78,8 +78,8 @@ Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tip
 | CORS desde el navegador | **OK**: las cuatro llamadas llegan y devuelven JSON; no hay bloqueo de origen |
 | Endpoints y cuerpos | **OK**: `/users/me/identity`, `pairedDevices`, `dataPoints:dailyRollUp` y `dataPoints:reconcile` existen y validan la petición |
 | Scopes | **Corregido**: `ListPairedDevices` exige `googlehealth.settings.readonly`; sin él devolvía `403 ACCESS_TOKEN_SCOPE_INSUFFICIENT` |
-| Cuenta | **OK** tras vincular Google Health: `legacyUserId=G9HLWR`, `healthUserId=5485020454767125441` |
-| Datos reales | **OK**: 1 dispositivo `MobileTrack` y **11.074 pasos** del 2026-10-31 |
+| Cuenta | **OK** tras vincular Google Health: la identidad devuelve un `legacyUserId` y un `healthUserId` válidos |
+| Datos reales | **OK**: 1 dispositivo `MobileTrack` y recuento de pasos de un día real |
 
 **Vía validada:** `Zepp → Health Connect → app Google Health → Google Health API → PWA`. El dispositivo que reporta la API es `MobileTrack` (el propio móvil), no un Fitbit: confirma que los datos llegan por Health Connect.
 
@@ -111,8 +111,8 @@ Ejecutado contra `health.googleapis.com` desde la PWA real, con Client ID de tip
 
 **Verificado de extremo a extremo** con la cuenta de datos:
 
-- Primera sincronización de 730 días: **7 de 13 categorías con datos nuevos** — pasos 545 de 574 recibidos, distancia 565, calorías activas 2, peso 2, altura 1, frecuencia cardiaca 7.278 muestras y minutos activos 2. Sin datos en grasa corporal, sueño, entrenamientos, pisos, oxígeno ni VO2 máximo.
-- Segunda sincronización de 30 días: **0 de 13 categorías con datos nuevos** (idempotente), con el aviso «No había huecos que rellenar: los datos de Zepp tienen prioridad».
+- Primera sincronización de 730 días: **7 de 13 categorías con datos nuevos** (pasos, distancia, calorías activas, peso, altura, frecuencia cardiaca y minutos activos). Sin datos en grasa corporal, sueño, entrenamientos, pisos, oxígeno ni VO2 máximo.
+- Segunda sincronización de 30 días: **0 de 13 categorías con datos nuevos** (idempotente), con el aviso «No había huecos que rellenar: los datos de Zepp tienen prioridad.»
 
 **Limitación conocida:** el sueño, los entrenamientos, los pisos, el oxígeno y el VO2 máximo no llegan a Google Health desde esta cuenta (ver 2.2.1). El código queda preparado y probado con datos sintéticos, pero no hay datos reales que validar. El importador de Zepp sigue siendo la fuente principal de sueño, frecuencia cardiaca, entrenamientos y cuerpo.
 
@@ -230,6 +230,33 @@ Cada gráfica de ECharts se puede abrir en un modal para analizarla con más det
 
 **Verificado de extremo a extremo** en local: en Actividad aparecen dos botones «Ampliar»; al pulsar uno se abre el diálogo con el título correcto y un canvas de 717×369 px, y el botón «Cerrar» lo cierra.
 
+### 2.8 Modo apaisado (2026-11-04)
+
+La PWA nace con `orientation: 'portrait'` en el manifest, así que al instalar la app el móvil no
+giraba. Ahora se declara `orientation: 'any'` y el CSS se adapta al horizontal:
+
+| Aspecto | Decisión |
+|---|---|
+| Manifest | `orientation: 'any'`; el navegador decide si rota según el ajuste del sistema |
+| Pantallas anchas | A partir de 900 px de ancho, cabecera, pestañas y contenido pasan a 1400 px máximos |
+| Poca altura (≤600 px) | Cabecera y tarjetas compactas, `stat-value` más pequeño y `.two-col` en dos columnas |
+| Móvil estrecho girado (≤700 px) | `.two-col` vuelve a una columna para no dejar gráficas minúsculas |
+| Modal de gráficas | En horizontal ocupa el 98 % del ancho y el 94 % del alto |
+| Pantalla de bloqueo | Menos relleno y tarjeta algo más ancha para que no haya que hacer scroll |
+| Gráficas | No requieren cambios: `ResizeObserver` recalcula al girar |
+
+**Verificado de extremo a extremo** con Chrome CDP y `Emulation.setDeviceMetricsOverride`:
+
+| Viewport | Resultado |
+|---|---|
+| 390×844 (vertical) | `.two-col` a una columna, rejilla de métricas a 2 columnas, sin desbordamiento |
+| 844×390 (móvil girado) | `.two-col` a dos columnas, rejilla a 6 columnas, modal 827×367 px (98 % × 94 %) |
+| 640×360 (móvil pequeño girado) | `.two-col` vuelve a una columna para no dejar gráficas minúsculas |
+| 1280×720 (escritorio) | contenido a 1400 px y `.two-col` a dos columnas |
+
+En los cuatro casos `scrollWidth` coincide con el ancho del cuerpo (cero desbordamiento
+horizontal) y las gráficas se redimensionan solas al girar.
+
 ## 3. Arquitectura
 
 ```
@@ -247,7 +274,7 @@ Google Health API ────┼─► importadores en el navegador ─► norm
 
 | Paso | Estado |
 |---|---|
-| 1. Spike de validación de Google Health | **Hecho**: OAuth, CORS, endpoints y datos reales (11.074 pasos) con la cuenta vinculada a Google Health |
+| 1. Spike de validación de Google Health | **Hecho**: OAuth, CORS, endpoints y datos reales (pasos de un día) con la cuenta vinculada a Google Health |
 | 2. Repo y scaffold Vite + React + TS + PWA | Hecho |
 | 3. Capa de datos: SQLite WASM + snapshot cifrado | Hecho |
 | 4. Importador Zepp CSV | Hecho (11 carpetas, transacción única, `INSERT OR REPLACE`) |
@@ -403,7 +430,7 @@ Resueltos durante la implementación:
 Siguen abiertos:
 
 - ~~Verificar CORS real de `health.googleapis.com`~~: confirmado, las llamadas desde el navegador funcionan.
-- ~~Crear el cliente OAuth web en Google Cloud~~: hecho; Client ID `513900864660-...apps.googleusercontent.com`, con `localhost:4173` y `https://jblancoantelo.github.io` autorizados.
+- ~~Crear el cliente OAuth web en Google Cloud~~: hecho; Client ID propio de tipo *aplicación web*, con `localhost:4173` y `https://jblancoantelo.github.io` autorizados. El ID se configura en Ajustes y no se versiona.
 - ~~Vincular la cuenta a Google Health~~: hecho con la cuenta de datos; la API devuelve identidad, dispositivo `MobileTrack` y pasos reales.
 - ~~Confirmar cobertura de sueño~~: **resuelto**; la sonda sin filtro también devuelve vacío y el dispositivo no anuncia `SLEEP`, así que Google Health no tiene sueño de esta cuenta. Siguiente paso: revisar los permisos de sueño en Health Connect en el móvil.
 - Renovación silenciosa de GIS y comportamiento si falla.
@@ -447,4 +474,4 @@ Siguen abiertos:
 - **Firma:** workflow `contributor-assistant/github-action@v2.6.1` en `.github/workflows/cla.yml`; firmas en la rama `cla-signatures`.
 - **Modelo comercial:** AGPL para la comunidad + licencia comercial (`COMMERCIAL.md`).
 - **Marca:** `TRADEMARK.md`.
-- **Pendiente:** revisión del CLA por un abogado; GitHub mostrará AGPL-3.0 cuando `poc` se fusione en `main`. Titular legal y contacto confirmados: **Juan Blanco Antelo** / jblancoantelo@gmail.com.
+- **Pendiente:** revisión del CLA por un abogado; GitHub mostrará AGPL-3.0 cuando `poc` se fusione en `main`. Titular legal y contacto: ver `NOTICE` y `COMMERCIAL.md`.
