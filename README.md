@@ -67,7 +67,7 @@ src/
   state/     ciclo crear/desbloquear/guardar/restaurar
   ui/        vistas y componentes
   lib/       fechas, formato y series
-docs/        decisiones y arquitectura
+docs/        decisiones, arquitectura e ideas
 ```
 
 ## Google Health
@@ -101,6 +101,7 @@ Requisitos: cliente OAuth de tipo *aplicación web* con el origen autorizado, Go
 ## Documentación
 
 - [Decisiones y arquitectura](docs/decisiones.md)
+- [Ideas y cobertura de datos](docs/ideas.md): qué se saca hoy de Health Connect y Google Health, y qué falta
 - [Guía para agentes](AGENTS.md): cómo trabajar, probar de extremo a extremo y desplegar
 
 ## Licencia

@@ -318,6 +318,7 @@ Consejos:
 |---|---|
 | `README.md` | qué hace, stack, desarrollo, despliegue y tabla de categorías de Google Health |
 | `docs/decisiones.md` | decisiones, hallazgos y verificaciones E2E fechadas |
+| `docs/ideas.md` | auditoría de cobertura, huecos de Health Connect/Google Health y roadmap de ampliaciones |
 | `AGENTS.md` | esta guía: cómo trabajar, probar y desplegar |
 
 Al terminar un cambio visible: actualiza los tres y sube versión.
